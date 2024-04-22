@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>OES toolbox by Julian Held</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="res.qrc">
+    <normaloff>:/images/icon.png</normaloff>:/images/icon.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
@@ -1393,7 +1397,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
