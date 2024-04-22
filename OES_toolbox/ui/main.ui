@@ -674,6 +674,22 @@
        </property>
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
+         <spacer name="verticalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Fixed</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>12</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
          <widget class="PlotWidget" name="specplot"/>
         </item>
         <item>
@@ -1377,7 +1393,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
