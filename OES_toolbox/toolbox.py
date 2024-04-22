@@ -278,7 +278,7 @@ class Window(QMainWindow):
         " Walks through the plotted curves and assignes colors."
         cc = 0   
         for plot_item in self.specplot.listDataItems():
-            if "file" in plot_item.name():
+            if "file:" in plot_item.name():
                 pen = pyqtgraph.mkPen(color=colors[cc])
                 plot_item.setPen(pen)
                 plot_item.setZValue(1)
@@ -286,21 +286,23 @@ class Window(QMainWindow):
                 cc = cc%len(colors)
                 
         for plot_item in self.specplot.listDataItems():                     
-            if "cont" in plot_item.name():
-                pen = pyqtgraph.mkPen(color=colors[cc])
+            if "cont.:" in plot_item.name():
+                pen = pyqtgraph.mkPen(color=colors[cc], width=2)
                 plot_item.setPen(pen)
+                plot_item.setZValue(10)
                 cc = cc + 1
                 cc = cc%len(colors)   
                 
         for plot_item in self.specplot.listDataItems():     
-            if "molecule" in plot_item.name():
+            if "molecule:" in plot_item.name():
                 pen = pyqtgraph.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine)
                 plot_item.setPen(pen)
+                plot_item.setZValue(20)
                 cc = cc + 1
                 cc = cc%len(colors)
         
         for plot_item in self.specplot.listDataItems():     
-            if "NIST" in plot_item.name():
+            if "NIST:" in plot_item.name():
                 pen = pyqtgraph.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine, width=1.0)
                 plot_item.setPen(pen)
                 cc = cc + 1
