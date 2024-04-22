@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="150"
+   height="200"
+   viewBox="0 0 39.687499 52.916681"
+   version="1.1"
+   id="svg1"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <text
+       xml:space="preserve"
+       style="font-size:4.9389px;font-family:sans-serif;-inkscape-font-specification:sans-serif;text-align:center;text-anchor:middle;fill:#666666;stroke-width:0.313973;stroke-dasharray:1.88384, 0.627946"
+       x="30.870989"
+       y="9.1831169"
+       id="text1"
+       transform="rotate(33.221888)"><tspan
+         sodipodi:role="line"
+         id="tspan1"
+         style="fill:#666666;stroke-width:0.313972"
+         x="30.870989"
+         y="9.1831169">drag &amp; drop</tspan><tspan
+         sodipodi:role="line"
+         style="fill:#666666;stroke-width:0.313972"
+         x="30.870989"
+         y="15.356742"
+         id="tspan2">files or folders</tspan></text>
+  </g>
+</svg>

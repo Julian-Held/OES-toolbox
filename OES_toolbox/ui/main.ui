@@ -1,0 +1,1585 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1267</width>
+    <height>683</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>OES toolbox by Julian Held</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QSplitter" name="splitter">
+      <property name="lineWidth">
+       <number>0</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="handleWidth">
+       <number>15</number>
+      </property>
+      <widget class="QTabWidget" name="left_tabs">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+         <horstretch>8</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <widget class="QWidget" name="files_tab">
+        <attribute name="title">
+         <string>Files</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_2"/>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_2">
+           <property name="title">
+            <string>Files</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_5">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_35">
+              <item>
+               <widget class="QPushButton" name="button_open_files">
+                <property name="text">
+                 <string>Open files</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="button_open">
+                <property name="text">
+                 <string>Open folder</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QTreeWidget" name="file_list">
+              <property name="contextMenuPolicy">
+               <enum>Qt::CustomContextMenu</enum>
+              </property>
+              <property name="acceptDrops">
+               <bool>true</bool>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QFrame {background-image: url(:/images/background.png); 
+              background-position: center center;
+              background-repeat: no-repeat;
+              background-color: white; 
+};</string>
+              </property>
+              <property name="dragDropMode">
+               <enum>QAbstractItemView::DropOnly</enum>
+              </property>
+              <property name="selectionMode">
+               <enum>QAbstractItemView::ExtendedSelection</enum>
+              </property>
+              <property name="columnCount">
+               <number>1</number>
+              </property>
+              <attribute name="headerVisible">
+               <bool>false</bool>
+              </attribute>
+              <attribute name="headerDefaultSectionSize">
+               <number>97</number>
+              </attribute>
+              <attribute name="headerStretchLastSection">
+               <bool>false</bool>
+              </attribute>
+              <column>
+               <property name="text">
+                <string notr="true">1</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_9">
+              <item>
+               <widget class="QComboBox" name="plot_combobox">
+                <property name="currentText">
+                 <string>plot selected</string>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>plot selected</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>plot checked</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="clear_file_list">
+                <property name="text">
+                 <string>Clear</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_4">
+           <property name="title">
+            <string>Background subtraction</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_9">
+            <item>
+             <widget class="QCheckBox" name="bg_internal_check">
+              <property name="text">
+               <string>Background from same file</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="bg_extra_check">
+              <property name="text">
+               <string>Background from seperate file</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_21">
+              <item>
+               <widget class="QLineEdit" name="bg_extra_ledit">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="bg_extra_btn">
+                <property name="text">
+                 <string>Open</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="file_opt_group">
+           <property name="title">
+            <string>File options</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_2">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_3">
+              <item>
+               <widget class="QLabel" name="label">
+                <property name="text">
+                 <string>Preset</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox">
+                <item>
+                 <property name="text">
+                  <string>autodetect</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>custom</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Avantes</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>OceanOptics</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLabel" name="label_2">
+                <property name="text">
+                 <string>Delimiter     </string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="lineEdit"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <item>
+               <widget class="QLabel" name="label_3">
+                <property name="text">
+                 <string>Header lines</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox_5"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_13">
+              <item>
+               <widget class="QLabel" name="label_8">
+                <property name="text">
+                 <string>Footer lines</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox_4"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_10">
+              <item>
+               <widget class="QLabel" name="label_6">
+                <property name="text">
+                 <string>Wavelength column</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox">
+                <property name="value">
+                 <number>1</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_11">
+              <item>
+               <widget class="QLabel" name="label_5">
+                <property name="text">
+                 <string>Data Column</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox_2">
+                <property name="value">
+                 <number>2</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_12">
+              <item>
+               <widget class="QLabel" name="label_7">
+                <property name="text">
+                 <string>Background column</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox_3">
+                <property name="minimum">
+                 <number>-1</number>
+                </property>
+                <property name="value">
+                 <number>-1</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="settings_tab">
+        <attribute name="title">
+         <string>Settings</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="QGroupBox" name="groupBox_6">
+           <property name="title">
+            <string>Spectrometer options</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_12">
+            <item>
+             <widget class="QRadioButton" name="specopt_manual_radio">
+              <property name="text">
+               <string>From settings below</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_42">
+              <item>
+               <widget class="QRadioButton" name="specopt_builtin_radio">
+                <property name="text">
+                 <string>From spectrometer class</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="specopt_info">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="cursor">
+                 <cursorShape>ArrowCursor</cursorShape>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add your own spectromter class to owl for more freedom in terms of instrumental profile, intensity and wavelength calibration.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="frameShape">
+                 <enum>QFrame::Box</enum>
+                </property>
+                <property name="frameShadow">
+                 <enum>QFrame::Sunken</enum>
+                </property>
+                <property name="text">
+                 <string>?</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>false</bool>
+                </property>
+                <property name="openExternalLinks">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_41">
+              <item>
+               <widget class="QComboBox" name="specopt_spec_cbox">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                  <horstretch>12</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="specopt_reload_owl">
+                <property name="text">
+                 <string>🗘</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="specopt_inctcal_group">
+           <property name="title">
+            <string>Intensity Calibration</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_6">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_6">
+              <item>
+               <widget class="QPushButton" name="open_cal_folder_btn">
+                <property name="text">
+                 <string>Open Folder</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="add_cal_file_btn">
+                <property name="text">
+                 <string>Add Calibration</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="calibration_info">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="cursor">
+                 <cursorShape>ArrowCursor</cursorShape>
+                </property>
+                <property name="toolTip">
+                 <string>Calibration files must use tab or space delimiters and represent the relative sensitivity of the spectrometer as photons/s.</string>
+                </property>
+                <property name="frameShape">
+                 <enum>QFrame::Box</enum>
+                </property>
+                <property name="frameShadow">
+                 <enum>QFrame::Sunken</enum>
+                </property>
+                <property name="text">
+                 <string>?</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>false</bool>
+                </property>
+                <property name="openExternalLinks">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_20">
+              <item>
+               <widget class="QLabel" name="label_13">
+                <property name="text">
+                 <string>Select calibration file:</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_19">
+              <item>
+               <widget class="QComboBox" name="cal_files_cbox">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                  <horstretch>12</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="cal_refresh_btn">
+                <property name="text">
+                 <string>🗘</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="apply_cal_check">
+              <property name="text">
+               <string>Apply calibration</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="specopt_profile_group">
+           <property name="title">
+            <string>Instrumental profile</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_14">
+            <item>
+             <widget class="QLabel" name="label_16">
+              <property name="text">
+               <string>Pseudo Voigt (shape 0 = Gauss)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_33">
+              <item>
+               <widget class="QLabel" name="label_18">
+                <property name="text">
+                 <string>Shape (0-1)</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="mol_instr_mu">
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.500000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_32">
+              <item>
+               <widget class="QLabel" name="label_17">
+                <property name="text">
+                 <string>Width [nm]</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="mol_instr_w">
+                <property name="decimals">
+                 <number>3</number>
+                </property>
+                <property name="maximum">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.010000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.010000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="specopt_axis_group">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="title">
+            <string>Wavelength axis</string>
+           </property>
+           <property name="checkable">
+            <bool>false</bool>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_13">
+            <item>
+             <widget class="QCheckBox" name="specopt_wloverwrite">
+              <property name="text">
+               <string>Calculate from class</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_43">
+              <item>
+               <widget class="QLabel" name="label_26">
+                <property name="text">
+                 <string>Central wl. [nm]</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="specopt_cwl">
+                <property name="maximum">
+                 <double>9999.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>400.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_44">
+              <item>
+               <widget class="QLabel" name="label_27">
+                <property name="text">
+                 <string>Order</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="specopt_order">
+                <property name="maximum">
+                 <number>5</number>
+                </property>
+                <property name="value">
+                 <number>1</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>427</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="widget" native="true">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+         <horstretch>25</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="PlotWidget" name="specplot"/>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Wavelength shift [nm]</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="wl_shift">
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.010000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="pos_display">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QProgressBar" name="progress_bar">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="maximum">
+             <number>0</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+            <property name="textVisible">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="copy_plots_btn">
+            <property name="text">
+             <string>Graph to clipboard</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QTabWidget" name="right_tabs">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+         <horstretch>10</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <widget class="QWidget" name="ident_tab">
+        <attribute name="title">
+         <string>Identification</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_8">
+         <item>
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>Select spectra: i.e. H I, Ar I-III</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="spec_line"/>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_8">
+           <item>
+            <widget class="QPushButton" name="ident_go">
+             <property name="text">
+              <string>Display</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="ident_clear">
+             <property name="text">
+              <string>Clear</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_14">
+           <item>
+            <widget class="QLabel" name="label_9">
+             <property name="text">
+              <string>Intensity</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="ident_int_cbox">
+             <item>
+              <property name="text">
+               <string>NIST rel. int</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>LTE</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_22">
+           <item>
+            <widget class="QLabel" name="ident_Te_label">
+             <property name="text">
+              <string>Te [eV]</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="ident_Te">
+             <property name="decimals">
+              <number>2</number>
+             </property>
+             <property name="minimum">
+              <double>0.010000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>100.000000000000000</double>
+             </property>
+             <property name="singleStep">
+              <double>0.100000000000000</double>
+             </property>
+             <property name="value">
+              <double>2.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableWidget" name="ident_table">
+           <attribute name="verticalHeaderVisible">
+            <bool>false</bool>
+           </attribute>
+           <column>
+            <property name="text">
+             <string>Ion</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>wl [nm]</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>rel. int</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Aik</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Ek - Ei</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>conf, lower</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>conf. upper</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="molecules_tab">
+        <attribute name="title">
+         <string>Molecules</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_10">
+         <item>
+          <layout class="QGridLayout" name="mol_select_grid"/>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="mol_select_nofit_group">
+           <property name="title">
+            <string>Identify only (no fitting)</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_11">
+            <item>
+             <layout class="QGridLayout" name="mol_select_grid_nofit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_27">
+           <item>
+            <widget class="QLabel" name="label_14">
+             <property name="text">
+              <string>Rotational Temp. [K]</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="mol_Trot_sbox">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+             <property name="singleStep">
+              <number>50</number>
+             </property>
+             <property name="value">
+              <number>300</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_29">
+           <item>
+            <widget class="QLabel" name="label_15">
+             <property name="text">
+              <string>Vibrational Temp. [K]</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="mol_Tvib_sbox">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+             <property name="singleStep">
+              <number>50</number>
+             </property>
+             <property name="value">
+              <number>1200</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="mol_multitemp_group">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="title">
+            <string>Fit seperate temperature per species</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_15">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_45">
+              <item>
+               <widget class="QCheckBox" name="mol_multifit_rot_check">
+                <property name="text">
+                 <string>Rotational</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="mol_multifit_vib_check">
+                <property name="text">
+                 <string>Vibrational</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_31">
+           <item>
+            <widget class="QCheckBox" name="mol_limit_range_check">
+             <property name="text">
+              <string>Limit WL range</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="mol_min_wl_sbox">
+             <property name="minimum">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>9999.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>130.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="mol_max_wl_sbox">
+             <property name="minimum">
+              <double>11.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>9999.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>1200.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_34">
+           <item>
+            <widget class="QCheckBox" name="mol_wl_shift_check">
+             <property name="text">
+              <string>Allow wl shift</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="mol_wl_stretch_check">
+             <property name="text">
+              <string>Allow wl stretch</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_46">
+           <item>
+            <widget class="QComboBox" name="mol_fit_what_combobox">
+             <item>
+              <property name="text">
+               <string>Fit all displayed</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Fit all selected</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_28">
+           <item>
+            <widget class="QPushButton" name="mol_show_btn">
+             <property name="text">
+              <string>Show</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="mol_fit_btn">
+             <property name="text">
+              <string>Fit</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="mol_clear_btn">
+             <property name="text">
+              <string>Clear plots</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableWidget" name="mol_fit_results_table">
+           <property name="contextMenuPolicy">
+            <enum>Qt::CustomContextMenu</enum>
+           </property>
+           <column>
+            <property name="text">
+             <string>file</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Trot / K</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Tvib / K</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_30">
+           <item>
+            <widget class="QPushButton" name="mol_save_btn">
+             <property name="text">
+              <string>Save data</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="mol_clear_data_btn">
+             <property name="text">
+              <string>Clear data</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="continuum_tab">
+        <attribute name="title">
+         <string>Continuum</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_7">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_15">
+           <item>
+            <widget class="QLabel" name="label_11">
+             <property name="text">
+              <string>Type</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="comboBox_3">
+             <item>
+              <property name="text">
+               <string>Black body</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_16">
+           <item>
+            <widget class="QLabel" name="label_12">
+             <property name="text">
+              <string>Temperature [K]</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="cont_T0">
+             <property name="maximum">
+              <number>999999</number>
+             </property>
+             <property name="singleStep">
+              <number>100</number>
+             </property>
+             <property name="value">
+              <number>1500</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_17">
+           <item>
+            <widget class="QCheckBox" name="cont_minfilter_check">
+             <property name="text">
+              <string>Minimum filter</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="cont_minfilter_num">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+             <property name="singleStep">
+              <number>1</number>
+             </property>
+             <property name="value">
+              <number>1</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_23">
+           <item>
+            <widget class="QCheckBox" name="cont_medfilter_check">
+             <property name="text">
+              <string>Median filter</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="cont_medfilter_num">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+             <property name="singleStep">
+              <number>2</number>
+             </property>
+             <property name="value">
+              <number>1</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_26">
+           <item>
+            <widget class="QCheckBox" name="cont_limit_range_check">
+             <property name="text">
+              <string>Limit WL range</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="cont_min_wl_box">
+             <property name="maximum">
+              <double>9999.899999999999636</double>
+             </property>
+             <property name="singleStep">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>130.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="cont_max_wl_box">
+             <property name="maximum">
+              <double>9999.989999999999782</double>
+             </property>
+             <property name="singleStep">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>1200.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_25">
+           <item>
+            <widget class="QComboBox" name="cont_fit_what_combobox">
+             <item>
+              <property name="text">
+               <string>Fit all displayed</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Fit all selected</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="cont_fit_y0_check">
+             <property name="text">
+              <string>Fit vertical offset</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_18">
+           <item>
+            <widget class="QPushButton" name="show_continuum_btn">
+             <property name="text">
+              <string>Show</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="fit_continuum_btn">
+             <property name="text">
+              <string>Fit</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="clear_continuum_btn">
+             <property name="text">
+              <string>Clear plots</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableWidget" name="cont_fit_results_table">
+           <property name="contextMenuPolicy">
+            <enum>Qt::CustomContextMenu</enum>
+           </property>
+           <column>
+            <property name="text">
+             <string>file</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>temperature / K</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>intensity</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_24">
+           <item>
+            <widget class="QPushButton" name="cont_save_btn">
+             <property name="text">
+              <string>Save data</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="cont_clear_data_btn">
+             <property name="text">
+              <string>Clear data</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1267</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <widget class="QMenu" name="menuExport">
+     <property name="title">
+      <string>Export</string>
+     </property>
+     <addaction name="action_export_plot_data"/>
+     <addaction name="action_export_ident_table"/>
+     <addaction name="action_export_molecule_fit_results"/>
+     <addaction name="action_export_continuum_fit_results"/>
+    </widget>
+    <addaction name="actionOpenFolder"/>
+    <addaction name="actionOpenFiles"/>
+    <addaction name="menuExport"/>
+    <addaction name="actionClearFiles"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionRefresh_plots"/>
+    <addaction name="actionClear_Plots"/>
+    <addaction name="separator"/>
+    <addaction name="actionClear_Ident_Plots"/>
+    <addaction name="separator"/>
+    <addaction name="actionClear_Molecule_Plots"/>
+    <addaction name="actionClear_Molecule_Table"/>
+    <addaction name="separator"/>
+    <addaction name="actionClear_Continuum_Plots"/>
+    <addaction name="actionClear_Continuum_Table"/>
+   </widget>
+   <widget class="QMenu" name="menuAbout">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionDocumentation"/>
+    <addaction name="actionHow_to_cite"/>
+    <addaction name="actionAbout"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="actionShow_Left_Pane"/>
+    <addaction name="actionShow_Right_Pane"/>
+   </widget>
+   <widget class="QMenu" name="menuGraph">
+    <property name="title">
+     <string>Graph</string>
+    </property>
+    <addaction name="action_graph_to_clipboard"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuView"/>
+   <addaction name="menuAbout"/>
+   <addaction name="menuGraph"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionOpenFolder">
+   <property name="text">
+    <string>Open Folder</string>
+   </property>
+  </action>
+  <action name="actionClearFiles">
+   <property name="text">
+    <string>Clear Files</string>
+   </property>
+  </action>
+  <action name="actionOpenFiles">
+   <property name="text">
+    <string>Open Files</string>
+   </property>
+  </action>
+  <action name="action_export_ident_table">
+   <property name="text">
+    <string>NIST Ident. Table</string>
+   </property>
+  </action>
+  <action name="action_export_plot_data">
+   <property name="text">
+    <string>Plot Data</string>
+   </property>
+  </action>
+  <action name="action_export_molecule_fit_results">
+   <property name="text">
+    <string>Molecule Fit Results</string>
+   </property>
+  </action>
+  <action name="action_export_continuum_fit_results">
+   <property name="text">
+    <string>Continuum Fit Results</string>
+   </property>
+  </action>
+  <action name="actionRefresh_plots">
+   <property name="text">
+    <string>Refresh Plots</string>
+   </property>
+  </action>
+  <action name="actionClear_Plots">
+   <property name="text">
+    <string>Clear Plots</string>
+   </property>
+  </action>
+  <action name="actionClear_Ident_Plots">
+   <property name="text">
+    <string>Clear Ident.</string>
+   </property>
+  </action>
+  <action name="actionClear_Molecule_Plots">
+   <property name="text">
+    <string>Clear Molecule Plots</string>
+   </property>
+  </action>
+  <action name="actionClear_Molecule_Table">
+   <property name="text">
+    <string>Clear Molecule Table</string>
+   </property>
+  </action>
+  <action name="actionClear_Continuum_Table">
+   <property name="text">
+    <string>Clear Continuum Table</string>
+   </property>
+  </action>
+  <action name="actionDocumentation">
+   <property name="text">
+    <string>Documentation</string>
+   </property>
+  </action>
+  <action name="actionHow_to_cite">
+   <property name="text">
+    <string>How To Cite</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+  <action name="actionClear_Continuum_Plots">
+   <property name="text">
+    <string>Clear Continuum Plots</string>
+   </property>
+  </action>
+  <action name="actionShow_Left_Pane">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Left Pane</string>
+   </property>
+  </action>
+  <action name="actionShow_Right_Pane">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Right Pane</string>
+   </property>
+  </action>
+  <action name="action_graph_to_clipboard">
+   <property name="text">
+    <string>Copy to clipboard</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QGraphicsView</extends>
+   <header>pyqtgraph</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="res.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>spec_line</sender>
+   <signal>returnPressed()</signal>
+   <receiver>ident_go</receiver>
+   <slot>click()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1125</x>
+     <y>91</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1064</x>
+     <y>119</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
