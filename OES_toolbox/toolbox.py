@@ -327,31 +327,38 @@ class Window(QMainWindow):
         # fig = plt.gca()
         canvas = FigureCanvas(fig)
         style = ''
+        counter = 0
         for plot_item in self.specplot.listDataItems():
             if "file" in plot_item.name():
                 x,y = plot_item.getData()          
-                plt.plot(x,y, style, label=plot_item.name(), zorder=3)
+                plt.plot(x,y, style, label="measurement", zorder=3)
+                counter = counter+1
 
         for plot_item in self.specplot.listDataItems():                     
             if "cont" in plot_item.name():
-                x,y = plot_item.getData()          
-                plt.plot(x,y, style, label=plot_item.name())
+                x,y = plot_item.getData()       
+                style = '--'   
+                plt.plot(x,y, style, label=plot_item.name(), lw=1, zorder=10)
+                counter = counter+1
 
         for plot_item in self.specplot.listDataItems():     
             if "molecule" in plot_item.name():
                 x,y = plot_item.getData() 
                 style = '--'
                 plt.plot(x,y, style, label=plot_item.name())
-        
+                counter = counter+1
+
         for plot_item in self.specplot.listDataItems():     
             if "NIST" in plot_item.name():
                 x,y = plot_item.getData()   
                 style = ':'
                 plt.plot(x,y, style, label=plot_item.name(), lw=0.5)
-        
+                counter = counter+1
+
         plt.xlim(xlim)
         plt.ylim(ylim)
-        plt.legend()
+        if counter > 1:
+            plt.legend()
         plt.xlabel('wavelength / nm')
         plt.ylabel('intensity')
         canvas.draw()
