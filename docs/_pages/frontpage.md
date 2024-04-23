@@ -3,7 +3,7 @@ permalink: /
 layout: home
 ---
 
-![an image alt text]({{ site.baseurl }}/assets/screenshot.png "an image title")
+![an image alt text]({{ site.baseurl }}/assets/screenshot.png)
 
 
 ## OES toolbox
