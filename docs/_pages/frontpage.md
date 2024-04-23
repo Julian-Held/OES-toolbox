@@ -6,7 +6,7 @@ layout: home
 ![an image alt text]({{ site.baseurl }}/assets/screenshot.png)
 
 
-## OES toolbox
+# OES toolbox
 Helping out with optical emission spectroscopy of low-temperaturew plasmas.
 
 - Identifying optical emission lines.
