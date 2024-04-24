@@ -7,7 +7,7 @@ layout: home
 
 
 # OES toolbox
-Helping out with optical emission spectroscopy of low-temperaturew plasmas.
+_Helping out with optical emission spectroscopy of low-temperature plasmas!_
 
 - Identifying optical emission lines.
 - Fitting molecular spectra.
