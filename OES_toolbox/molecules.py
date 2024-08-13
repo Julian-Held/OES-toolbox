@@ -7,16 +7,13 @@ from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6 import QtGui
 
-from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-from scipy.signal import fftconvolve
-
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
-import Moose # free re-implementation of MassiveOES
 
 def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
     """Function copied from Moose without the normalization to the maximum. """
+    import Moose # free re-implementation of MassiveOES
+
     sticks = Moose.create_stick_spectrum(T_vib, T_rot, sim_db)
     refined = Moose.equidistant_mesh(sticks, wl_pad=wl_pad, resolution=resolution)
     simulation = apply_voigt(refined, instr)
@@ -25,14 +22,18 @@ def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
 
 def apply_voigt(sim, instr):
     """Function copied from Moose to allow arbitrary instrumental functions."""
+    from scipy.signal import fftconvolve
     x = sim[:, 0]
     conv = fftconvolve(sim[:, 1], instr(x), mode="same")
     return np.array([x, conv]).T
 
 def match_spectra(meas, sim):
     """Function copied from Moose to solve out of bounds errors."""
-    interp = interp1d(sim[:, 0], sim[:, 1], bounds_error=False, fill_value=0)
+    from scipy.interpolate import make_interp_spline as interp1d
+    interp = interp1d(sim[:, 0], sim[:, 1])
+    interp.extrapolate = False
     matched_y = interp(meas[:, 0])
+    matched_y = np.nan_to_num(matched_y)
     return np.array([meas[:, 0], matched_y]).T
 
 def get_mOES_spec(x, Tvib, Trot, molecule, instr):
@@ -96,6 +97,7 @@ class MoleculeFitter(QObject):
 
     def fit(self):
         self.progress.emit(1)
+        from scipy.optimize import curve_fit
 
         # A and the temps must be >0
         self.bounds = [list(np.zeros(len(self.p0))),
@@ -141,6 +143,7 @@ class molecule_selector(QCheckBox):
             self.can_fit = True
     
     def load_db(self, wl=(0,99999)):
+        import Moose
         if self.can_fit:
             if self.src == "mOES":
                 try:
@@ -232,6 +235,8 @@ class molecule_module():
 
 
     def show_spec(self):
+        from scipy.signal import fftconvolve
+
         self.clear_spec()
             
         min_x = 0

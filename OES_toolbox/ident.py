@@ -7,12 +7,6 @@ from astropy.table import Table as aTable
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
-import sys
-import os.path
-home = os.path.expanduser('~')
-sys.path.append(home + '/.local/lib/')
-import owlspec as owl # type: ignore
-
 
 class NISTloader(QObject):
     def __init__(self, spec, wl_range, max_y, Te=-1, lw=-1, parent=None):
@@ -30,6 +24,7 @@ class NISTloader(QObject):
     
     def run(self):
         self.progress.emit(1)
+        import owlspec as owl
         try:
             ele_spec = owl.spectrum(self.spec, wl_range=self.wl_range)
             nist_data = ele_spec.get_linedata()
@@ -58,6 +53,8 @@ class ident_module():
         
     def update_spec_ident(self): 
         """ Loads NIST spectra and plots them. """
+        import owlspec as owl # type: ignore
+
         min_x = 0
         max_x = 1100
         max_y = 1

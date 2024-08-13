@@ -7,12 +7,12 @@ from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTreeWidget,\
 from PyQt6.QtCore import Qt
 from PyQt6 import sip
 
-import sif_parser
+from sif_parser import np_open
+from sif_parser.utils import extract_calibration
 from . import pyAvantes
 from .winspec import SpeFile
 from file_read_backwards import FileReadBackwards
 import csv
-import pandas as pd
 
 
 def guess_delimiter(filename):
@@ -142,6 +142,7 @@ class fio():
     
     
     def load_generic_file(self, path, footer=0):
+        from pandas import read_csv
         delimiter = guess_delimiter(path)
         with open(path, "r") as data:
             pos = 0
@@ -157,7 +158,7 @@ class fio():
                 pos = data.tell()
 
             data.seek(pos) # need to take one step back to catch every line
-            temp = pd.read_csv(data, delimiter=delimiter, decimal=decimal, 
+            temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
                                                skipfooter=footer, header=None)
             temp = temp.to_numpy().T
             
@@ -189,6 +190,8 @@ class fio():
         content - load a specific part of the file?
         num - which column to load, only if content=True
         """
+        from pandas import read_csv
+
         x,y = np.zeros(1024), np.zeros(1024)
         textchars = bytearray({7,8,9,10,12,13,27} | set(range(0x20, 0x100)) - {0x7f})
         is_binary_string = lambda bytes: bool(bytes.translate(None, textchars))
@@ -217,7 +220,7 @@ class fio():
                         pos = data.tell()
     
                     data.seek(pos) # need to take one step back to catch every line
-                    temp = pd.read_csv(data, delimiter=';', decimal=decimal, header=None)
+                    temp = read_csv(data, delimiter=';', decimal=decimal, header=None)
                     temp = temp.to_numpy().T
                     
                 x = temp[header.index("Wave")]
@@ -253,8 +256,8 @@ class fio():
             
             case "andor_sif":
                 self.mw.bg_internal_check.hide()
-                data, info = sif_parser.np_open(path)
-                x = sif_parser.utils.extract_calibration(info)
+                data, info = np_open(path)
+                x = extract_calibration(info)
                 cols = np.shape(data)[0]
                 if not content and cols > 1:
                     for i in np.arange(cols):
@@ -328,7 +331,7 @@ class fio():
                         delimiter = sniffer.sniff(data.read(500).replace(decimal, '.')).delimiter
         
                         data.seek(pos) # need to take one step back to catch every line
-                        temp = pd.read_csv(data, delimiter=delimiter, decimal=decimal, 
+                        temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
                                                    skipfooter=footer, engine='python',
                                                    header=None)
                         temp = temp.to_numpy().T

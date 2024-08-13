@@ -12,12 +12,7 @@ from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph
 
-from scipy.interpolate import interp1d
-
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 file_dir = os.path.dirname(os.path.abspath(__file__))
-plt.style.use(file_dir + '/ui/jh-paper.mplstyle')
 
 from .ui import resources # seems unused but is needed!
 from OES_toolbox.settings import settings
@@ -82,7 +77,7 @@ class Window(QMainWindow):
         if not os.path.exists(self.cal_path):
             os.makedirs(self.cal_path)
         self.cal = [[],[]]
-        self.cal_files_refresh()
+        self.cal_files_refresh() # TODO move out of thread to improve startup perfromance
         
         # center plot
         self.specplot.setLabel("left", "intensity")
@@ -322,6 +317,10 @@ class Window(QMainWindow):
             
             
     def graph_to_clipboard(self):
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+        plt.style.use(file_dir + '/ui/jh-paper.mplstyle')
+
         xlim, ylim = self.specplot.getViewBox().viewRange()
         fig = plt.figure()
         # fig = plt.gca()
@@ -617,6 +616,7 @@ class Window(QMainWindow):
         load it and save it to self.cal, if we test-load it anyway..."""
         if len(filename) > 0:
             try:
+                from scipy.interpolate import interp1d
                 x,y = np.loadtxt(os.path.join(self.cal_path, filename)).T
                 self.cal = interp1d(x, y, bounds_error=False, fill_value=0)
                 self.apply_cal_check.setEnabled(True)

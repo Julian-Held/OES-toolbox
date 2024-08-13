@@ -6,9 +6,6 @@ from PyQt6.QtWidgets import  QFileDialog, QTreeWidgetItemIterator, \
 from PyQt6.QtCore import Qt
 
 from scipy import constants as const
-from scipy.optimize import curve_fit
-from scipy.signal import medfilt
-from scipy.ndimage import minimum_filter1d
 
 
 def black_body(x, T, A):
@@ -35,8 +32,10 @@ class cont_module():
                 
         if self.mw.cont_medfilter_check.isChecked() or self.mw.cont_minfilter_check.isChecked():
             if self.mw.cont_minfilter_check.isChecked():
+                from scipy.ndimage import minimum_filter1d
                 y = minimum_filter1d(y, self.mw.cont_minfilter_num.value())
             if self.mw.cont_medfilter_check.isChecked():
+                from scipy.signal import medfilt
                 y = medfilt(y, self.mw.cont_medfilter_num.value())
             self.mw.plot(x, y, 'cont.: filtered ' + plot_item.name().replace('file:',''))
             self.mw.update_spec_colors()
@@ -92,10 +91,14 @@ class cont_module():
         
     
     def fit_cont_spec(self,x,y,label):
+        from scipy.optimize import curve_fit
+        
         if self.mw.cont_minfilter_check.isChecked():
+            from scipy.ndimage import minimum_filter1d
             y = minimum_filter1d(y, self.mw.cont_minfilter_num.value())
         
         if self.mw.cont_medfilter_check.isChecked():
+            from scipy.signal import medfilt
             y = medfilt(y, self.mw.cont_medfilter_num.value())
     
         T0 = self.mw.cont_T0.value()
