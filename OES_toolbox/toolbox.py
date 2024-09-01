@@ -639,10 +639,11 @@ class Window(QMainWindow):
     
     
 
-def run():
-    app = QApplication(sys.argv)
+def run(app, splash):
     app.setApplicationName("OES toolbox")
+
     win = Window()
     win.show()
+    splash.finish(win)
     sys.exit(app.exec())
     
