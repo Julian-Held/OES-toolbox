@@ -1,0 +1,12 @@
+Source: oes-toolbox
+Section: python
+Priority: extra
+Maintainer: Julian Held <julian.held@rub.de>
+Build-Depends: debhelper (>= 9), python3 (>=3.8), dh-virtualenv (>= 0.8)
+Standards-Version: 3.9.5
+
+Package: oes-toolbox
+Architecture: any
+Pre-Depends: dpkg (>= 1.16.1), python3 (>=3.8), ${misc:Pre-Depends}
+Depends: ${misc:Depends}
+Description: Helping out with optical emission spectroscopy of low-temperature plasmas.

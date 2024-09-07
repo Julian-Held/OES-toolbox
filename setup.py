@@ -24,6 +24,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.10.9',
-    entry_points = {'gui_scripts': ['OES-toolbox = cost_power_monitor:main']}
+    python_requires='>=3.8.1',
+    package_data={'OES_toolbox': ['ui/main.ui', 'ui/resources.py', 'ui/jh-paper.mplstyle', 'data/mol_spec/*.mod']},
+    entry_points = {'gui_scripts': ['OES-toolbox = OES_toolbox:main']}
 )
