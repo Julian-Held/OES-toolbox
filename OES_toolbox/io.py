@@ -137,7 +137,7 @@ class fio():
 
     def open_bg_file(self):
         path = QFileDialog.getOpenFileName(caption='Open background file')[0]
-        self.mw.g_extra_ledit.setText(path)                
+        self.mw.bg_extra_ledit.setText(path)                
         return path
     
     
