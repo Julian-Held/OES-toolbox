@@ -16,7 +16,7 @@ file_dir = os.path.dirname(os.path.abspath(__file__))
 
 from .ui import resources # seems unused but is needed!
 from OES_toolbox.settings import settings
-from OES_toolbox.io import fio
+from OES_toolbox.fio import fio
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
