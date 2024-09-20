@@ -89,7 +89,7 @@ class Window(QMainWindow):
         self.action_export_plot_data.triggered.connect(self.io.save_plots)
         self.actionRefresh_plots.triggered.connect(self.update_spec)
         self.proxy = pyqtgraph.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
-        # self.actionClear_Plots.triggered.connect() # TODO clear all function! Needs to touch a lot of things
+        self.actionClear_Plots.triggered.connect(self.clear_all_spec)
     
         # file loading, plotting /drag & drop
         self.file_opt_group.hide() # TODO not a thing yet, hide for now
@@ -447,8 +447,15 @@ class Window(QMainWindow):
                 self.plot_children(this_item)
                     
         self.update_spec_colors()
-                 
+
+    
+    def clear_all_spec(self):
+        self.mol.clear_spec()
+        self.ident.clear_spec_ident()
+        self.cont.clear_continuum()
+        self.update_spec()
             
+
 ##############################################################################
 # <--------------------------- drag & drop --------------------------------> #
 ##############################################################################
