@@ -9,6 +9,10 @@ Helping out with optical emission spectroscopy of low-temperature plasmas.
 - Batch processing.
 - Free and open-source.
 
+## Citation
+Please make sure to cite all appropriate sources when publishing results obtained using the software.
+[The wiki has more information.](https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite)
+
 ## Supported file types
 The software currently supports the following file types:
 - Avantes .txt: Supports optional background subtraction and multiple measurements.
