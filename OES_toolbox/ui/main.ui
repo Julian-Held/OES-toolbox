@@ -1397,7 +1397,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -1457,8 +1457,8 @@
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
-   <addaction name="menuAbout"/>
    <addaction name="menuGraph"/>
+   <addaction name="menuAbout"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpenFolder">

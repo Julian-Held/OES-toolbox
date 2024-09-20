@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QSettings, \
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph
+import webbrowser
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -54,6 +55,30 @@ the decimal delimiter and tab as the delimiter between the two columns."""
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
 
+
+class about_dialog(QDialog):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("About OES toolbox")
+
+        msg = """OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.
+        Powered by owl, Moose/MassiveOES, astroquery and others.
+        Version: 0.3.1
+        MIT License - Copyright (c) 2024 Julian Held
+        https://oes-toolbox.com/
+        """
+
+        QBtn = QDialogButtonBox.StandardButton.Ok
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+
+        self.layout = QVBoxLayout()
+        message = QLabel(msg)
+        self.layout.addWidget(message)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
 
 
 class Window(QMainWindow):
@@ -115,6 +140,11 @@ class Window(QMainWindow):
         self.bg_extra_check.stateChanged.connect(self.update_spec)
         self.bg_extra_ledit.num = 0
         self.file_list.customContextMenuRequested.connect(self.file_rightClick)
+
+        # help menu
+        self.actionDocumentation.triggered.connect(lambda: webbrowser.open('https://github.com/mimurrayy/OES-toolbox/wiki'))
+        self.actionHow_to_cite.triggered.connect(lambda: webbrowser.open('https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite'))
+        self.actionAbout.triggered.connect(lambda: about_dialog().exec())
 
         # spectromter settings
         self.groupBox_6.hide() # TODO not a thing yet, hide for now
