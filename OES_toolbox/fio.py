@@ -174,8 +174,10 @@ class fio():
             return "ocean_ss_txt"
         if file_head[0:16] == b"Andor Technology":
             return "andor_sif"
+        if not is_bin and ext == "asc" and b"Date and Time:" in file_head:
+            return "andor_asc_r" # header top
         if not is_bin and ext == "asc":
-            return "andor_asc"
+            return "andor_asc" # header bottom or none
         if is_bin and ext == "spe":
             return "pi_spe"
         if not is_bin and ext == "csv":
@@ -307,7 +309,7 @@ class fio():
                 else:
                     y = data[num][:,0]
                 
-            case "generic_txt" | "ocean_ss_txt":
+            case "generic_txt" | "ocean_ss_txt" | "andor_asc_r":
                 self.mw.bg_internal_check.hide()
                 if file_type == "ocean_ss_txt":
                     footer = 2
