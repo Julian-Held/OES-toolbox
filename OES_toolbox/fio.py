@@ -141,9 +141,58 @@ class fio():
         return path
     
     
-    def load_generic_file(self, path, footer=0):
+    def load_generic_file(self, path, tree_item, content, num, file_type):
         from pandas import read_csv
-        delimiter = guess_delimiter(path)
+        decimal = '.'
+
+        self.mw.bg_internal_check.hide()
+        if file_type == "ocean_ss_txt":
+            footer = 2
+        else:
+            footer = 0
+            
+        sniffer = csv.Sniffer()
+        try:
+            with open(path, "r") as data:
+                pos = 0
+                i = 0
+                while True:
+                    i = i+1
+                    line = data.readline()
+                    if len(line.strip()) > 0 and i > 1:
+                        if line.strip()[0].isdigit(): 
+                            if not '.' in line:
+                                decimal = ','
+                            break
+                    pos = data.tell()
+                delimiter = sniffer.sniff(data.read(500).replace(decimal, '.')).delimiter
+
+                data.seek(pos) # need to take one step back to catch every line
+                temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
+                                            skipfooter=footer, engine='python',
+                                            header=None)
+                temp = temp.to_numpy().T
+        except Exception as e:
+            print(e)          
+
+        x, y = temp[0], temp[1:]
+        cols = np.shape(y)[0]
+        if not content and cols > 1:
+            for i in np.arange(cols):
+                label = "Scan " + str(i+1)
+                item = self.mw.filetree_item(label, is_content=True, num=i)
+                tree_item.addChild(item)
+        elif content:
+            y = y[num]
+        
+        return x,y
+    
+
+    def open_avantes_txt(self, path, tree_item, content, num):
+        from pandas import read_csv
+        decimal = '.'
+
+        self.mw.bg_internal_check.show()
         with open(path, "r") as data:
             pos = 0
             i = 0
@@ -155,15 +204,38 @@ class fio():
                         if ',' in line:
                             decimal = ','
                         break
+                if line.strip().startswith("Wave"):
+                    header = [e.strip() for e in line.strip().split(';') if e]
                 pos = data.tell()
 
             data.seek(pos) # need to take one step back to catch every line
-            temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
-                                               skipfooter=footer, header=None)
+            temp = read_csv(data, delimiter=';', decimal=decimal, header=None)
             temp = temp.to_numpy().T
             
-        return temp
-    
+        x = temp[header.index("Wave")]
+        if self.mw.bg_internal_check.isChecked() == True:
+            dark = temp[header.index("Dark")]
+        else:
+            dark = np.zeros(len(x))
+        if "Sample" in header:
+            y = temp[header.index("Sample")] - dark
+        if "Samples" in header:
+            scans = temp[header.index("Samples"):]
+            if not content and len(scans) > 1:
+                for i,scan in enumerate(scans):
+                    label = "Scan " + str(i+1)
+                    item = self.mw.filetree_item(label, is_content=True, num=i)
+                    tree_item.addChild(item)
+                y = scans - dark  
+
+            else:                      
+                y = scans[num] - dark
+                
+        if not self.mw.bg_extra_check.isChecked():
+            y = y  - dark
+        
+        return x, y
+
 
     def guess_file_type(self, file_head, ext, is_bin):
         if b"Data measured with spectrometer [name]:" in file_head:
@@ -201,51 +273,10 @@ class fio():
         is_bin = is_binary_string(file_head)
         ext = path.split('.')[-1].lower()
         file_type = self.guess_file_type(file_head, ext, is_bin)
-        decimal = '.'
 
         match file_type:
             case "avantes_txt":
-                self.mw.bg_internal_check.show()
-                with open(path, "r") as data:
-                    pos = 0
-                    i = 0
-                    while True:
-                        i = i+1
-                        line = data.readline()
-                        if len(line.strip()) > 0 and i > 1:
-                            if line.strip()[0].isdigit(): 
-                                if ',' in line:
-                                    decimal = ','
-                                break
-                        if line.strip().startswith("Wave"):
-                            header = [e.strip() for e in line.strip().split(';') if e]
-                        pos = data.tell()
-    
-                    data.seek(pos) # need to take one step back to catch every line
-                    temp = read_csv(data, delimiter=';', decimal=decimal, header=None)
-                    temp = temp.to_numpy().T
-                    
-                x = temp[header.index("Wave")]
-                if self.mw.bg_internal_check.isChecked() == True:
-                    dark = temp[header.index("Dark")]
-                else:
-                    dark = np.zeros(len(x))
-                if "Sample" in header:
-                    y = temp[header.index("Sample")] - dark
-                if "Samples" in header:
-                    scans = temp[header.index("Samples"):]
-                    if not content and len(scans) > 1:
-                        for i,scan in enumerate(scans):
-                            label = "Scan " + str(i+1)
-                            item = self.mw.filetree_item(label, is_content=True, num=i)
-                            tree_item.addChild(item)
-                        y = scans - dark  
-    
-                    else:                      
-                        y = scans[num] - dark
-                        
-                if not self.mw.bg_extra_check.isChecked():
-                    y = y  - dark
+                x, y = self.open_avantes_txt(path, tree_item, content, num)
 
             case "avantes_raw8":
                 self.mw.bg_internal_check.show()
@@ -310,45 +341,7 @@ class fio():
                     y = data[num][:,0]
                 
             case "generic_txt" | "ocean_ss_txt" | "andor_asc_r":
-                self.mw.bg_internal_check.hide()
-                if file_type == "ocean_ss_txt":
-                    footer = 2
-                else:
-                    footer = 0
-                    
-                sniffer = csv.Sniffer()
-                try:
-                    with open(path, "r") as data:
-                        pos = 0
-                        i = 0
-                        while True:
-                            i = i+1
-                            line = data.readline()
-                            if len(line.strip()) > 0 and i > 1:
-                                if line.strip()[0].isdigit(): 
-                                    if not '.' in line:
-                                        decimal = ','
-                                    break
-                            pos = data.tell()
-                        delimiter = sniffer.sniff(data.read(500).replace(decimal, '.')).delimiter
-        
-                        data.seek(pos) # need to take one step back to catch every line
-                        temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
-                                                   skipfooter=footer, engine='python',
-                                                   header=None)
-                        temp = temp.to_numpy().T
-                except Exception as e:
-                    print(e)          
-
-                x, y = temp[0], temp[1:]
-                cols = np.shape(y)[0]
-                if not content and cols > 1:
-                    for i in np.arange(cols):
-                        label = "Scan " + str(i+1)
-                        item = self.mw.filetree_item(label, is_content=True, num=i)
-                        tree_item.addChild(item)
-                elif content:
-                    y = y[num]
+                x,y = self.load_generic_file(path, tree_item, content, num, file_type)
 
             
         # apply intensity calibration    
