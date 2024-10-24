@@ -11,11 +11,15 @@ Helping out with optical emission spectroscopy of low-temperature plasmas.
 - Fitting molecular spectra.
 - Batch processing.
 - Free and open-source.
+### [**Download**](https://github.com/mimurrayy/OES-toolbox/releases/latest)
 
 Powered by [owl](https://github.com/mimurrayy/owl), [Moose](https://github.com/AntoineTUE/Moose)/[MassiveOES](https://bitbucket.org/OES_muni/massiveoes), [astroquery](https://github.com/astropy/astroquery) and others.   
 
-### [**Download**](https://github.com/mimurrayy/OES-toolbox/releases/latest)
 
+## Documentation
+* [Installation](https://github.com/mimurrayy/OES-toolbox/wiki/Installation)
+* [How to cite](https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite)
+* [Usage](https://github.com/mimurrayy/OES-toolbox/wiki/Usage)
 
 ## Supported file types
 The software currently supports the following file types:
