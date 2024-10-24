@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1267</width>
-    <height>683</height>
+    <height>684</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,6 +16,9 @@
   <property name="windowIcon">
    <iconset resource="res.qrc">
     <normaloff>:/images/icon.png</normaloff>:/images/icon.png</iconset>
+  </property>
+  <property name="locale">
+   <locale language="English" country="UnitedStates"/>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
@@ -707,6 +710,18 @@
           </item>
           <item>
            <widget class="QDoubleSpinBox" name="wl_shift">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="decimals">
              <number>3</number>
             </property>
@@ -1397,7 +1412,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
