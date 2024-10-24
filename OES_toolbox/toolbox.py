@@ -64,7 +64,7 @@ class about_dialog(QDialog):
 
         msg = """OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.
         Powered by owl, Moose/MassiveOES, astroquery and others.
-        Version: 0.3.1
+        Version: 0.3.2
         MIT License - Copyright (c) 2024 Julian Held
         https://oes-toolbox.com/
         """
