@@ -165,7 +165,7 @@
             <item>
              <widget class="QCheckBox" name="bg_extra_check">
               <property name="text">
-               <string>Background from seperate file</string>
+               <string>Background from separate file</string>
               </property>
              </widget>
             </item>
@@ -1437,9 +1437,6 @@
     <property name="title">
      <string>Edit</string>
     </property>
-    <addaction name="actionRefresh_plots"/>
-    <addaction name="actionClear_Plots"/>
-    <addaction name="separator"/>
     <addaction name="actionClear_Ident_Plots"/>
     <addaction name="separator"/>
     <addaction name="actionClear_Molecule_Plots"/>
@@ -1467,6 +1464,8 @@
     <property name="title">
      <string>Graph</string>
     </property>
+    <addaction name="actionClear_Plots"/>
+    <addaction name="actionRefresh_plots"/>
     <addaction name="action_graph_to_clipboard"/>
    </widget>
    <addaction name="menuFile"/>
