@@ -483,6 +483,7 @@ class Window(QMainWindow):
         self.mol.clear_spec()
         self.ident.clear_spec_ident()
         self.cont.clear_continuum()
+        self.file_list.clearSelection()
         self.update_spec()
             
 
