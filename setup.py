@@ -5,9 +5,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="OES-toolbox",
-    version="0.3.2",
+    version="0.3.3",
     author="Julian Held",
-    author_email="julian.held@umn.edu",
+    author_email="j.held@tue.nl",
     license='MIT',
     platforms=['any'],
     description="Tool for low-temperature plasma optical emission spectroscopy.",
