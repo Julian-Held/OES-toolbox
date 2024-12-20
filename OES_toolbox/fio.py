@@ -149,7 +149,14 @@ class fio():
         if file_type == "ocean_ss_txt":
             footer = 2
         else:
-            footer = 0
+            with FileReadBackwards(path) as data:
+                footer = 0
+                while True:
+                    line = data.readline()
+                    if len(line.strip()) > 0:
+                        if line.strip()[0].isdigit(): break
+                    else:
+                        footer = footer + 1
             
         sniffer = csv.Sniffer()
         try:
@@ -184,7 +191,7 @@ class fio():
                 tree_item.addChild(item)
         elif content:
             y = y[num]
-        
+
         return x,y
     
 
