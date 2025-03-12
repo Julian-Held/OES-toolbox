@@ -18,3 +18,9 @@ Helping out with optical emission spectroscopy of low-temperature plasmas.
 
 
 Powered by [owl](https://github.com/mimurrayy/owl), [Moose](https://github.com/AntoineTUE/Moose)/[MassiveOES](https://bitbucket.org/OES_muni/massiveoes), [astroquery](https://github.com/astropy/astroquery) and others.   
+
+
+### Documentation
+* [Installation](https://github.com/mimurrayy/OES-toolbox/wiki/Installation)
+* [How to cite](https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite)
+* [Usage](https://github.com/mimurrayy/OES-toolbox/wiki/Usage)
