@@ -6,6 +6,10 @@ from PyQt6.QtGui import QPixmap
 from OES_toolbox.ui import resources # seems unused but is needed!
 import sys
 
+from importlib import metadata
+
+VERSION = metadata.version("OES_toolbox")
+
 def main():
     app = QApplication(sys.argv)
 
