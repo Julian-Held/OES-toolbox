@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
+
+[project]
+name = "OES-toolbox"
+dynamic = ["version"]
+description = "Tool for low-temperature plasma optical emission spectroscopy."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Julian Held", email = "j.held@tue.nl" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "file-read-backwards>=3.0.0",
+    "matplotlib>=3.7.0",
+    "moose-spectra>=0.2.1",
+    "owlspec>=0.2.2",
+    "PyQt6>=6.5.0",
+    "pyqtgraph>=0.13.1",
+    "sif-parser>=0.3.0",
+]
+
+[project.gui-scripts]
+OES-toolbox = "OES_toolbox:main"
+
+[project.urls]
+Homepage = "https://oes-toolbox.com"
+
+[tool.hatch.version]
+source="vcs"
+fallback-version="0.0.1dev"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "OES_toolbox/_version.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+fragments = [
+    { path = "README.md" }
+]
+
+[tool.hatch.build]
+packages = ["OES_toolbox/"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/oes_toolbox",
+]
+
+[tool.hatch.envs.default]
+installer = "uv"
+extra-dependencies = ["ipykernel","ipython"]
+
+
+[tool.ruff]
+line-length=120
+target-version = "py310"
+
+[tool.ruff.format]
+exclude = ["*.py"]
+
+[tool.ruff.lint]
+extend-ignore = ["F401","E402","D"]
+extend-select = ["E4", "E7", "E9", "F","C4", "SIM", "NPY", "PD","B","UP"]
