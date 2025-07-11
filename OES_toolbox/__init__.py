@@ -8,7 +8,7 @@ import sys
 
 from importlib import metadata
 
-VERSION = metadata.version("OES_toolbox")
+from ._version import __version__
 
 def main():
     app = QApplication(sys.argv)
