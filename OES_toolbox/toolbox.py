@@ -22,7 +22,7 @@ from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
 
-
+from importlib.metadata import metadata
 
 colors = ['k', '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
           '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'] # matplotlib default
@@ -59,15 +59,17 @@ the decimal delimiter and tab as the delimiter between the two columns."""
 class about_dialog(QDialog):
     def __init__(self):
         super().__init__()
-
+        m = metadata("OES_toolbox")
         self.setWindowTitle("About OES toolbox")
 
-        msg = """OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.
+        msg = f"""OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.
         Powered by owl, Moose/MassiveOES, astroquery and others.
-        Version: 0.3.3
-        MIT License - Copyright (c) 2024 Julian Held
-        https://oes-toolbox.com/
+        Version: {m['version']}
+        {m['License-Expression']} License - Copyright (c) 2024 Julian Held
         """
+        for url in m.get_all("Project-URL"):
+            category,link = url.split(', ')
+            msg += f"{category}: {link}\n"
 
         QBtn = QDialogButtonBox.StandardButton.Ok
 
@@ -513,7 +515,7 @@ class Window(QMainWindow):
                 self.io.add_sub(path, item)
         event.accept()
 
- 
+
     def filetree_item(self, label, is_content=False, num=0): # TODO: should really be a class
         item = QTreeWidgetItem()
         item.setText(0, label)

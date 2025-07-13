@@ -58,3 +58,6 @@ docs/_build/
 # PyBuilder
 target/
 
+# Local development files and folders
+/.ruff_cache
+OES_toolbox/_version.py
