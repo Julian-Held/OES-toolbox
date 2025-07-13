@@ -105,7 +105,7 @@ class Window(QMainWindow):
             os.makedirs(self.cal_path)
         self.cal = [[],[]]
         self.cal_files_refresh() # TODO move out of thread to improve startup perfromance
-        self.max_child_plot = 5
+        self.max_child_plot = 8
         
         # center plot
         self.specplot.setLabel("left", "intensity")
