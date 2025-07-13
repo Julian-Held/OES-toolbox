@@ -144,6 +144,9 @@ class fio():
     def load_generic_file(self, path, tree_item, content, num, file_type):
         from pandas import read_csv
         decimal = '.'
+        
+        import charset_normalizer #import from_bytes, from_path
+        codec = charset_normalizer.from_path(path).best().encoding
 
         self.mw.bg_internal_check.hide()
         if file_type == "ocean_ss_txt":
@@ -160,7 +163,7 @@ class fio():
             
         sniffer = csv.Sniffer()
         try:
-            with open(path, "r") as data:
+            with open(path, "r", encoding=codec) as data:
                 pos = 0
                 i = 0
                 while True:
@@ -177,7 +180,7 @@ class fio():
                 data.seek(pos) # need to take one step back to catch every line
                 temp = read_csv(data, delimiter=delimiter, decimal=decimal, 
                                             skipfooter=footer, engine='python',
-                                            header=None)
+                                            header=None, encoding=codec)
                 temp = temp.to_numpy().T
         except Exception as e:
             print(e)          
@@ -198,9 +201,12 @@ class fio():
     def open_avantes_txt(self, path, tree_item, content, num):
         from pandas import read_csv
         decimal = '.'
+        
+        import charset_normalizer #import from_bytes, from_path
+        codec = charset_normalizer.from_path(path).best().encoding
 
         self.mw.bg_internal_check.show()
-        with open(path, "r") as data:
+        with open(path, "r", encoding=codec) as data:
             pos = 0
             i = 0
             while True:
@@ -216,7 +222,8 @@ class fio():
                 pos = data.tell()
 
             data.seek(pos) # need to take one step back to catch every line
-            temp = read_csv(data, delimiter=';', decimal=decimal, header=None)
+            temp = read_csv(data, delimiter=';', decimal=decimal, header=None, 
+                            encoding=codec)
             temp = temp.to_numpy().T
             
         x = temp[header.index("Wave")]
@@ -250,8 +257,10 @@ class fio():
         x1, x2 = None, None
         x = None
         scans = []
+        import charset_normalizer #import from_bytes, from_path
+        codec = charset_normalizer.from_path(path).best().encoding
         try:
-            with open(path, "r") as data:
+            with open(path, "r", encoding=codec) as data:
                 while True:
                     line = data.readline()
                     if not line:
@@ -321,7 +330,8 @@ class fio():
         num - which column to load, only if content=True
         """
         from pandas import read_csv
-
+        decimal = '.'
+        
         x,y = np.zeros(1024), np.zeros(1024)
         textchars = bytearray({7,8,9,10,12,13,27} | set(range(0x20, 0x100)) - {0x7f})
         is_binary_string = lambda bytes: bool(bytes.translate(None, textchars))
@@ -363,6 +373,8 @@ class fio():
             case "andor_asc":
                 self.mw.bg_internal_check.hide()
                 delimiter = guess_delimiter(path)
+                import charset_normalizer #import from_bytes, from_path
+                codec = charset_normalizer.from_path(path).best().encoding
                 with FileReadBackwards(path) as data:
                     pos = 0
                     while True:
