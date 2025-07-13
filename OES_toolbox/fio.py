@@ -242,6 +242,52 @@ class fio():
             y = y  - dark
         
         return x, y
+    
+    
+    def open_horiba_txt(self, path, tree_item, content, num):
+        "Loads Horiba txt files. Very preliminary due to limited test files."
+        delimiter = "\t" # always the case?
+        x1, x2 = None, None
+        x = None
+        scans = []
+        try:
+            with open(path, "r") as data:
+                while True:
+                    line = data.readline()
+                    if not line:
+                        break
+                    if "Wavelength" in line:
+                        if "HSen" in line:
+                            line = data.readline()
+                            x1 = np.array(line.strip().split(delimiter), dtype=float)
+                            
+                        if "HRes" in line:
+                            line = data.readline()
+                            x2 = np.array(line.strip().split(delimiter), dtype=float)
+                    
+                    if "Intensity:" in line:
+                        line = data.readline()
+                        while line.strip()[0].isdigit():
+                            tmp = np.array(line.strip().split(delimiter), dtype=float)
+                            scans.append(tmp)
+                            line = data.readline()
+                        break
+        except Exception as e:
+            print(e)  
+        
+        if not content and len(scans) > 1:
+            for i,scan in enumerate(scans):
+                label = "Scan " + str(i+1)
+                item = self.mw.filetree_item(label, is_content=True, num=i)
+                tree_item.addChild(item)
+            y = scans
+
+        else:                      
+            y = scans[num]
+            
+        x = x1 # no idea why there are 2 X axis
+        return x, y                
+    
 
 
     def guess_file_type(self, file_head, ext, is_bin):
@@ -259,6 +305,9 @@ class fio():
             return "andor_asc" # header bottom or none
         if is_bin and ext == "spe":
             return "pi_spe"
+        if not is_bin and b"OESi Camera Serial Number:" in file_head and \
+                                            b"Test SW Version:" in file_head:
+            return "horiba_txt" # fishy, tested for one file only
         if not is_bin and ext == "csv":
             return "generic_csv"        
         if not is_bin:
@@ -293,6 +342,9 @@ class fio():
                     y = S.getScope()-S.getDark()
                 else:
                     y = S.getScope()
+                    
+            case "horiba_txt":
+                x,y = self.open_horiba_txt(path, tree_item, content, num)
             
             case "andor_sif":
                 self.mw.bg_internal_check.hide()
