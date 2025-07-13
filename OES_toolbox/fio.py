@@ -395,7 +395,9 @@ class fio():
                         label = "Scan " + str(i+1)
                         item = self.mw.filetree_item(label, is_content=True, num=i)
                         tree_item.addChild(item)
-                    y = data[:][0].T   # TODO untested
+                    if np.ndim(data) == 3:
+                        y = data.transpose(2,0,1)[0]
+                        # TODO: the 0 here gets rid of multitrack, which we should support!
                 else:
                     y = data[num][:,0]
                 
@@ -420,6 +422,7 @@ class fio():
 
         if len(np.shape(y)) > 1 and (np.shape(y)[0] == 1 or np.shape(y)[1] == 1):
             y = y[0] # workaround for strange behavior when loading files...
+         
             
         return x, y
     

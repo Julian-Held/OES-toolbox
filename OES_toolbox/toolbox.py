@@ -105,6 +105,7 @@ class Window(QMainWindow):
             os.makedirs(self.cal_path)
         self.cal = [[],[]]
         self.cal_files_refresh() # TODO move out of thread to improve startup perfromance
+        self.max_child_plot = 5
         
         # center plot
         self.specplot.setLabel("left", "intensity")
@@ -440,24 +441,41 @@ class Window(QMainWindow):
             x = np.arange(0, np.shape(y)[-1])
             
         if np.ndim(y) > 1 and np.shape(y)[0] > 1:
-            for i,this_y in enumerate(y):
-                label = "file: " + this_item.text(0) + ", Scan " + str(i+1)
-                self.plot(x+self.wl_shift.value(), this_y, name=label)
+             # limit amount of data plottet at the same time (user can still force)    
+            if np.shape(y)[0] > self.max_child_plot: 
+                plot_idx = np.linspace(0, len(y)-1, self.max_child_plot, dtype=int)
+                y_ = []
+                for idx in plot_idx: # not elegant but cannot use indexing, y might be a list
+                    y_.append(y[idx])
+                y = y_
+                for i,this_y in zip(plot_idx, y):
+                    label = "file: " + this_item.text(0) + ", Scan " + str(i+1)
+                    self.plot(x+self.wl_shift.value(), this_y, name=label)
+            else:
+                for i,this_y in enumerate(y):
+                    label = "file: " + this_item.text(0) + ", Scan " + str(i+1)
+                    self.plot(x+self.wl_shift.value(), this_y, name=label)
         elif np.ndim(y) > 1:
             self.plot(x+self.wl_shift.value(), y[0], name=label)
         else:
             self.plot(x+self.wl_shift.value(), y, name=label)
 
     
-    def plot_children(self,item):
+    def plot_children(self, item):
         """ Recursivly walks through all children of selected tree item. Calls
         plot_filetree_item for each leaf. """
         if item.childCount() == 0:
             self.plot_filetree_item(item)
         else:
-            for idx in range(item.childCount()):
-                child = item.child(idx)
-                self.plot_children(child)
+            if item.childCount() > self.max_child_plot:
+                plot_idx = np.linspace(0, item.childCount()-1, self.max_child_plot)
+                for idx in plot_idx:   
+                        child = item.child(int(idx))
+                        self.plot_children(child)
+            else:
+                for idx in range(item.childCount()):                       
+                        child = item.child(idx)
+                        self.plot_children(child)
                 
                 
     def update_spec(self):
