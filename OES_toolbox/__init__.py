@@ -12,7 +12,11 @@ from ._version import __version__
 
 def main():
     app = QApplication(sys.argv)
-
+    if sys.platform == 'win32':
+        try:
+            app.setStyle('windowsvista')
+        except:
+            print("Cannot set style.")
     pixmap = QPixmap(":/images/splash.png")
     splash = QSplashScreen(pixmap)
     splash.show()
