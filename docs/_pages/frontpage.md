@@ -14,13 +14,13 @@ Helping out with optical emission spectroscopy of low-temperature plasmas.
 - Batch processing.
 - Free and open-source.
 
-### [**Download from GitHub**](https://github.com/mimurrayy/OES-toolbox/releases/latest)
+### [**Download from GitHub**](https://github.com/Julian-Held/OES-toolbox/releases/latest)
 
 
-Powered by [owl](https://github.com/mimurrayy/owl), [Moose](https://github.com/AntoineTUE/Moose)/[MassiveOES](https://bitbucket.org/OES_muni/massiveoes), [astroquery](https://github.com/astropy/astroquery) and others.   
+Powered by [owl](https://github.com/Julian-Held/owl), [Moose](https://github.com/AntoineTUE/Moose)/[MassiveOES](https://bitbucket.org/OES_muni/massiveoes), [astroquery](https://github.com/astropy/astroquery) and others.   
 
 
 ### Documentation
-* [Installation](https://github.com/mimurrayy/OES-toolbox/wiki/Installation)
-* [How to cite](https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite)
-* [Usage](https://github.com/mimurrayy/OES-toolbox/wiki/Usage)
+* [Installation](https://github.com/Julian-Held/OES-toolbox/wiki/Installation)
+* [How to cite](https://github.com/Julian-Held/OES-toolbox/wiki/How-to-cite)
+* [Usage](https://github.com/Julian-Held/OES-toolbox/wiki/Usage)
