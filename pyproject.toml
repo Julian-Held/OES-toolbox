@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme"]
+requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme","pynsist", "pip-tools"]
 build-backend = "hatchling.build"
 
 [project]
@@ -61,6 +61,9 @@ packages = ["OES_toolbox/"]
 include = [
     "/oes_toolbox",
 ]
+
+[tool.hatch.build.targets.custom]
+path = "build-exe.py"
 
 [tool.hatch.envs.default]
 installer = "uv"
