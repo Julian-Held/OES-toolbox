@@ -5,10 +5,10 @@ author: "Julian Held"
 theme: minima
 
 base_url: /oes-toolbox
-repository: mimurrayy/oes-toolbox
+repository: Julian-Held/oes-toolbox
 
 # Minima social links
-github_username: mimurrayy
+github_username: Julian-Held
 
 # Minima: show excerpts in the frontpage
 show_excerpts: false
