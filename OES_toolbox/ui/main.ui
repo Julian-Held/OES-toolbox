@@ -83,11 +83,13 @@
               <property name="acceptDrops">
                <bool>true</bool>
               </property>
+              <property name="autoFillBackground">
+               <bool>true</bool>
+              </property>
               <property name="styleSheet">
                <string notr="true">QFrame {background-image: url(:/images/background.png); 
               background-position: center center;
               background-repeat: no-repeat;
-              background-color: white; 
 };</string>
               </property>
               <property name="dragDropMode">
@@ -709,7 +711,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="wl_shift">
+           <widget class="SpinBox" name="wl_shift">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
               <horstretch>0</horstretch>
@@ -1591,8 +1593,14 @@
  <customwidgets>
   <customwidget>
    <class>PlotWidget</class>
-   <extends>QGraphicsView</extends>
+   <extends>QWidget</extends>
    <header>pyqtgraph</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header location="global">pyqtgraph</header>
   </customwidget>
  </customwidgets>
  <resources>

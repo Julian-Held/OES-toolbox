@@ -1,5 +1,6 @@
 import os
 import datetime
+from pathlib import Path
 import warnings
 import numpy as np
 from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTreeWidget,\
@@ -112,19 +113,20 @@ class fio():
     
     def open_folder(self):
         folder = QFileDialog.getExistingDirectory(caption='Open Folder')
-        if os.path.isdir(folder):
-            self.mw.file_list.clear()
-            self.active_folder = folder
+        if folder !="":
+            if os.path.isdir(folder):
+                self.mw.file_list.clear()
+                self.active_folder = folder
 
-        spec_files = sorted(os.listdir(self.active_folder))
-        for f in spec_files:
-            item = self.mw.filetree_item(f)
-            self.mw.file_list.addTopLevelItem(item)
-            if os.path.isdir(os.path.join(folder, f)):
-                self.add_sub(os.path.join(folder, f), item)
-                
-        return folder
-    
+            spec_files = list(Path(self.active_folder).iterdir())
+            for f in spec_files:
+                if Path(f).suffix in [".png",".jpg",".ico",".svg",".ipynb",".py",".pyc"]:
+                    continue
+                item = self.mw.filetree_item(f)
+                item.iterdir()
+                self.mw.file_list.addTopLevelItem(item)
+            return folder
+        
 
     def open_files(self):
         files = QFileDialog.getOpenFileNames(caption='Open Files')

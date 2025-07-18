@@ -1,16 +1,17 @@
 import os
 import sys
+from pathlib import Path
 import numpy as np
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QTreeWidgetItemIterator , QHeaderView, \
         QMainWindow, QVBoxLayout, QToolButton, QDialog, \
-        QDialogButtonBox, QLabel, QMenu
+        QDialogButtonBox, QLabel, QMenu,QTreeWidget
 from PyQt6.QtCore import Qt, QSettings, \
         QStandardPaths, QFile
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
-import pyqtgraph
+import pyqtgraph as pg
 import webbrowser
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,14 +22,16 @@ from OES_toolbox.fio import fio
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
+from OES_toolbox.Widgets import SpectrumTreeItem
+from OES_toolbox.logger import Logger
 
 from importlib.metadata import metadata
 
 colors = ['k', '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
           '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'] # matplotlib default
-pyqtgraph.setConfigOption('background', 'w')
-pyqtgraph.setConfigOption('foreground', 'k')
-pyqtgraph.setConfigOptions(antialias=True)
+pg.setConfigOption('background', 'w')
+pg.setConfigOption('foreground', 'k')
+pg.setConfigOptions(antialias=True)
 
 
 
@@ -87,6 +90,9 @@ class Window(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         uic.loadUi(file_dir + "/ui/main.ui", self)
+        self.status_msg = QLabel()
+        self.statusBar().addPermanentWidget(self.status_msg)
+        self.logger = Logger(self)
         self.progress_bar.hide()
         
         self.settings = settings(self)
@@ -111,12 +117,11 @@ class Window(QMainWindow):
         self.specplot.setLabel("left", "intensity")
         self.specplot.setLabel("bottom", "wavelength / nm")
         self.specplot.addLegend()
-        self.wl_shift.valueChanged.connect(self.update_spec)
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
         self.action_export_plot_data.triggered.connect(self.io.save_plots)
         self.actionRefresh_plots.triggered.connect(self.update_spec)
-        self.proxy = pyqtgraph.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
+        self.proxy = pg.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
         self.actionClear_Plots.triggered.connect(self.clear_all_spec)
     
         # file loading, plotting /drag & drop
@@ -126,17 +131,17 @@ class Window(QMainWindow):
         self.actionOpenFolder.triggered.connect(self.io.open_folder)
         self.actionOpenFiles.triggered.connect(self.io.open_files)
         
-        self.file_list.itemChanged.connect(self.update_spec_checkbox) # checkmark
-        self.file_list.itemSelectionChanged.connect(self.update_spec_selected) # highlight
+        self.file_list.itemSelectionChanged.connect(self.on_selection_change)
+        self.file_list.itemChanged.connect(self.on_check_change)
         self.plot_combobox.currentIndexChanged.connect(self.update_spec)
         self.file_list.dropEvent = self.do_drag_drop
         self.file_list.dragEnterEvent = self.check_drag_drop
         self.file_list.dragMoveEvent = self.check_drag_drop
         self.file_list.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.clear_file_list.clicked.connect(self.actionClearFiles.trigger)
-        self.actionClearFiles.triggered.connect(self.file_list.clear)
-        self.actionClearFiles.triggered.connect(self.update_spec)
-        self.file_list.keyPressEvent = self.io.file_list_keys
+        self.actionClearFiles.triggered.connect(self.on_file_clear_action)
+        # self.file_list.keyPressEvent = self.io.file_list_keys
+        self.file_list.keyPressEvent = self.file_list_keys
         self.bg_internal_check.hide()
         self.bg_internal_check.stateChanged.connect(self.update_spec)
         self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
@@ -281,6 +286,19 @@ class Window(QMainWindow):
             self.actionShow_Right_Pane.setChecked(False)
         else:
             self.actionShow_Right_Pane.setChecked(True)
+
+    def file_list_keys(self, event):
+        if event.key() == Qt.Key.Key_Delete:
+            iterator = QTreeWidgetItemIterator(self.file_list,flags=QTreeWidgetItemIterator.IteratorFlag.Selected)
+            root = self.file_list.invisibleRootItem()
+            while iterator.value():
+                this_item = iterator.value()
+                iterator += 1
+                self.logger.info(f"Removing {this_item.text(0)}")
+                (this_item.parent() or root).removeChild(this_item)
+        else:
+            QTreeWidget.keyPressEvent(self.file_list, event)
+        event.accept()
             
 
 ##############################################################################
@@ -303,11 +321,11 @@ class Window(QMainWindow):
         
     
     def update_spec_colors(self):
-        " Walks through the plotted curves and assignes colors."
+        """Walks through the plotted curves and assignes colors."""
         cc = 0   
         for plot_item in self.specplot.listDataItems():
             if "file:" in plot_item.name():
-                pen = pyqtgraph.mkPen(color=colors[cc])
+                pen = pg.mkPen(color=colors[cc])
                 plot_item.setPen(pen)
                 plot_item.setZValue(1)
                 cc = cc + 1
@@ -315,7 +333,7 @@ class Window(QMainWindow):
                 
         for plot_item in self.specplot.listDataItems():                     
             if "cont.:" in plot_item.name():
-                pen = pyqtgraph.mkPen(color=colors[cc], width=2)
+                pen = pg.mkPen(color=colors[cc], width=2)
                 plot_item.setPen(pen)
                 plot_item.setZValue(10)
                 cc = cc + 1
@@ -323,7 +341,7 @@ class Window(QMainWindow):
                 
         for plot_item in self.specplot.listDataItems():     
             if "molecule:" in plot_item.name():
-                pen = pyqtgraph.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine)
+                pen = pg.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine)
                 plot_item.setPen(pen)
                 plot_item.setZValue(20)
                 cc = cc + 1
@@ -331,7 +349,7 @@ class Window(QMainWindow):
         
         for plot_item in self.specplot.listDataItems():     
             if "NIST:" in plot_item.name():
-                pen = pyqtgraph.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine, width=1.0)
+                pen = pg.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine, width=1.0)
                 plot_item.setPen(pen)
                 cc = cc + 1
                 cc = cc%len(colors)
@@ -350,56 +368,10 @@ class Window(QMainWindow):
             
             
     def graph_to_clipboard(self):
-        import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-        plt.style.use(file_dir + '/ui/jh-paper.mplstyle')
-
-        xlim, ylim = self.specplot.getViewBox().viewRange()
-        fig = plt.figure()
-        # fig = plt.gca()
-        canvas = FigureCanvas(fig)
-        style = ''
-        counter = 0
-        for plot_item in self.specplot.listDataItems():
-            if "file" in plot_item.name():
-                x,y = plot_item.getData()          
-                plt.plot(x,y, style, label="measurement", zorder=3)
-                counter = counter+1
-
-        for plot_item in self.specplot.listDataItems():                     
-            if "cont" in plot_item.name():
-                x,y = plot_item.getData()       
-                style = '--'   
-                plt.plot(x,y, style, label=plot_item.name(), lw=1, zorder=10)
-                counter = counter+1
-
-        for plot_item in self.specplot.listDataItems():     
-            if "molecule" in plot_item.name():
-                x,y = plot_item.getData() 
-                style = '--'
-                plt.plot(x,y, style, label=plot_item.name())
-                counter = counter+1
-
-        for plot_item in self.specplot.listDataItems():     
-            if "NIST" in plot_item.name():
-                x,y = plot_item.getData()   
-                style = ':'
-                plt.plot(x,y, style, label=plot_item.name(), lw=0.5)
-                counter = counter+1
-
-        plt.xlim(xlim)
-        plt.ylim(ylim)
-        if counter > 1:
-            plt.legend()
-        plt.xlabel('wavelength / nm')
-        plt.ylabel('intensity')
-        canvas.draw()
-
-        width, height = fig.figbbox.width, fig.figbbox.height
-        img = QImage(canvas.buffer_rgba(), int(width), int(height), QImage.Format.Format_RGBA8888_Premultiplied)
-        pixmap = QPixmap(img)
-
-        QApplication.clipboard().setImage(pixmap.toImage())
+        from OES_toolbox.file_handling import FileExport
+        fig = FileExport.graph_to_matplotlib(self.specplot)
+        img = FileExport.matplotlib_to_image(fig)
+        QApplication.clipboard().setImage(img)
             
 
 ##############################################################################
@@ -409,102 +381,105 @@ class Window(QMainWindow):
     def update_spec_selected(self):
         if self.plot_combobox.currentIndex() == 0: # plot selected
             self.update_spec()
-        
-        
+
     def update_spec_checkbox(self):
         if self.plot_combobox.currentIndex() == 1:  # plot checked
             self.update_spec()
-       
-    
-    def plot_filetree_item(self, this_item):
-        """ Loads file and plots content. Walks up the tree to assemble the path. """
-        path = []
-        num = 0
-        if this_item.is_content:
-            current_parent =  this_item.parent().parent()
-            path.append(this_item.parent().text(0))
-            num = this_item.content_num
-            label = "file: " + this_item.parent().text(0) + ", Scan " + str(num+1)
-        else:
-            current_parent = this_item.parent()
-            path.append(this_item.text(0))
-            label = "file: " + this_item.text(0)
-        
-        while not current_parent is None:
-            path.append(current_parent.text(0))
-            current_item = current_parent
-            current_parent = current_item.parent()
-            
-        path = os.path.join(self.io.active_folder, *path[::-1])
-        x,y = self.io.open_file(path, this_item, num=num, content=this_item.is_content)
-        if x is None:
-            x = np.arange(0, np.shape(y)[-1])
-            
-        if np.ndim(y) > 1 and np.shape(y)[0] > 1:
-             # limit amount of data plottet at the same time (user can still force)    
-            if np.shape(y)[0] > self.max_child_plot: 
-                plot_idx = np.linspace(0, len(y)-1, self.max_child_plot, dtype=int)
-                y_ = []
-                for idx in plot_idx: # not elegant but cannot use indexing, y might be a list
-                    y_.append(y[idx])
-                y = y_
-                for i,this_y in zip(plot_idx, y):
-                    label = "file: " + this_item.text(0) + ", Scan " + str(i+1)
-                    self.plot(x+self.wl_shift.value(), this_y, name=label)
-            else:
-                for i,this_y in enumerate(y):
-                    label = "file: " + this_item.text(0) + ", Scan " + str(i+1)
-                    self.plot(x+self.wl_shift.value(), this_y, name=label)
-        elif np.ndim(y) > 1:
-            self.plot(x+self.wl_shift.value(), y[0], name=label)
-        else:
-            self.plot(x+self.wl_shift.value(), y, name=label)
 
-    
-    def plot_children(self, item):
-        """ Recursivly walks through all children of selected tree item. Calls
-        plot_filetree_item for each leaf. """
-        if item.childCount() == 0:
-            self.plot_filetree_item(item)
-        else:
-            if item.childCount() > self.max_child_plot:
-                plot_idx = np.linspace(0, item.childCount()-1, self.max_child_plot)
-                for idx in plot_idx:   
-                        child = item.child(int(idx))
-                        self.plot_children(child)
-            else:
-                for idx in range(item.childCount()):                       
-                        child = item.child(idx)
-                        self.plot_children(child)
-                
+    def plot_filetree_item(self, this_item:SpectrumTreeItem):
+        """Loads file and plots content. 
+        
+        Walks up the tree to assemble the path.
+        """
+        from OES_toolbox.file_handling import FileLoader
+        self.logger.debug(f"{this_item.label}: {this_item._data_has_been_loaded=}")
+        if not this_item._data_has_been_loaded:
+            path = this_item.path.resolve()
+            this_item.load_data()            
+            self.status_msg.setText(f"Loading file {path.name} complete!")
+        this_item.add_to_graph(self.specplot)               
                 
     def update_spec(self):
-        """ Checks which files are selected for plotting, loads and plots them. """
-        # remove file specs
-        for plot_item in self.specplot.listDataItems():
-            if "file" in plot_item.name():
-                self.specplot.removeItem(plot_item)
-        
-        # add file specs
-        iterator = QTreeWidgetItemIterator(self.file_list)
-        while iterator.value():
-            this_item = iterator.value()
-            iterator += 1
-            if (self.plot_combobox.currentIndex() == 0 and this_item.isSelected()) \
-                or (self.plot_combobox.currentIndex() == 1 
-                    and this_item.checkState(0) == Qt.CheckState.Checked):
-            
-                self.plot_children(this_item)
-                    
-        self.update_spec_colors()
+        """Checks which files are selected for plotting, loads and plots them."""
+        update_on_selected = self.plot_combobox.currentIndex() == 0
+        sender = self.sender()
+        sender_text = sender.text() if hasattr(sender,'text') else None
+        self.logger.warning(f"`Update spec` called by {sender} {sender_text=}; {update_on_selected=}")
 
+        if update_on_selected:
+            self.on_selection_change()
+        else:
+            iterator = QTreeWidgetItemIterator(
+                self.file_list,
+            )  # flags=QTreeWidgetItemIterator.IteratorFlag.Checked)
+            while iterator.value():
+                item = iterator.value()
+                iterator += 1
+                self.on_check_change(item, 0)
+
+    def on_selection_change(self):
+        update_on_selected = self.plot_combobox.currentIndex() == 0
+        self.logger.debug(f"Selection Changed -> {update_on_selected=}")
+        if update_on_selected:
+            viewbox = self.specplot.getViewBox()
+            autorange_state:list[bool] = viewbox.getState()['autoRange']
+            autorange_flag: bool = True in autorange_state
+            if autorange_flag:
+                viewbox.disableAutoRange()
+            selected = self.file_list.selectedItems()
+            iterator = QTreeWidgetItemIterator(self.file_list, flags=QTreeWidgetItemIterator.IteratorFlag.Unselected)
+            while iterator.value():
+                this_item = iterator.value()
+                iterator += 1
+                # self.specplot.removeItem(this_item.graph)
+                this_item.remove_from_graph(self.specplot)
+            for this_item in selected:
+                # if not this_item._data_has_been_loaded:
+                self.plot_filetree_item(this_item)
+                # this_item.add_to_graph(self.specplot)
+            if autorange_flag:
+                viewbox.autoRange()
+                self.logger.debug(f"Autoranging-> {autorange_state=}")
+            viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
+        
+        self.update_spec_colors()
+        
+
+    def on_check_change(self, item, col):
+        update_on_check = self.plot_combobox.currentIndex() == 1
+        if update_on_check:
+            viewbox = self.specplot.getViewBox()
+            autorange_state:list[bool] = viewbox.getState()['autoRange']
+            autorange_flag: bool = True in autorange_state
+            if autorange_flag:
+                viewbox.disableAutoRange()
+            check_state: bool = item.checkState(col) == Qt.CheckState.Checked
+            if check_state | item._is_checked_with_ancestors():
+                # if not item._data_has_been_loaded:
+                self.plot_filetree_item(item)
+                # item.add_to_graph(self.specplot)
+            else:
+                item.remove_from_graph(self.specplot)
+                # persist checked children
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    if child.checkState(col) == Qt.CheckState.Checked:
+                        child.add_to_graph(self.specplot)
+            if autorange_flag:
+                viewbox.autoRange()
+                self.logger.debug(f"Autoranging-> {autorange_state=}")
+            viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
+            self.update_spec_colors()
     
     def clear_all_spec(self):
         self.mol.clear_spec()
         self.ident.clear_spec_ident()
         self.cont.clear_continuum()
         self.file_list.clearSelection()
-        self.update_spec()
+        iterator = QTreeWidgetItemIterator(self.file_list,flags=QTreeWidgetItemIterator.IteratorFlag.Checked)
+        while iterator.value():
+            iterator.value().setCheckState(0,Qt.CheckState.Unchecked)
+            iterator += 1
             
 
 ##############################################################################
@@ -526,22 +501,16 @@ class Window(QMainWindow):
         
     def do_drag_drop(self, event):
         for url in event.mimeData().urls():
-            path = url.toLocalFile()
+            path = Path(url.toLocalFile())
             item = self.filetree_item(path)
+            item.iterdir()
             self.file_list.addTopLevelItem(item)
-            if os.path.isdir(path):
-                self.io.add_sub(path, item)
         event.accept()
 
 
-    def filetree_item(self, label, is_content=False, num=0): # TODO: should really be a class
-        item = QTreeWidgetItem()
-        item.setText(0, label)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        item.setCheckState(0,Qt.CheckState.Unchecked)
-        item.setBackground(0, QtGui.QColor('white'))
-        item.is_content = is_content
-        item.content_num = num
+    def filetree_item(self, path, is_content=False, num=0, label="Scan"): # TODO: should really be a class
+        path = Path(path)
+        item = SpectrumTreeItem(path = path, label=f"{label} {num}", content_num=num, is_content=is_content)
         return item
     
 
@@ -551,6 +520,7 @@ class Window(QMainWindow):
 
     def file_rightClick(self, cursor):
         file_item = self.file_list.itemAt(cursor)
+        self.logger.debug(f"{file_item.label=}")
         num = 0
         path = []
         if file_item.is_content:
@@ -561,17 +531,25 @@ class Window(QMainWindow):
             current_parent = file_item.parent()
             path.append(file_item.text(0))
             
-        while not current_parent is None:
+        while current_parent is not None:
             path.append(current_parent.text(0))
             current_item = current_parent
             current_parent = current_item.parent()
         path = os.path.join(self.io.active_folder, *path[::-1])
 
         menu = QMenu()
+        reload_action = QAction("Reload this file")
         bg_action = QAction("Use as background", checkable=True)
-        del_file_action = QAction("Clear selected")
+        del_file_action = QAction("Clear this file")
+        del_selected_action = QAction("Clear selected")
+        del_unselected_action = QAction("Clear not selected")
+        del_unchecked_action = QAction("Clear not checked")
         clear_action = QAction("Clear all")
         
+        if file_item.parent() is None:
+            menu.addAction(reload_action)
+            reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))
+
         bg_atm = False
         if self.bg_extra_ledit.text() == path and self.bg_extra_check.isChecked():
             if not file_item.is_content:
@@ -588,14 +566,19 @@ class Window(QMainWindow):
         if file_item.childCount() == 0:
             menu.addAction(bg_action)
             
-        if not file_item.is_content:
+        if file_item.is_content is False:
             menu.addAction(del_file_action)
+            del_file_action.triggered.connect(file_item.remove)
+        menu.addAction(del_selected_action)
+        menu.addAction(del_unselected_action)
+        menu.addAction(del_unchecked_action)
         menu.addAction(clear_action)
 
         bg_action.triggered.connect(lambda: self.file_rightclick_bg_action(path, bg_action.isChecked(), num))
-        del_file_action.triggered.connect(lambda: sip.delete(file_item))
-        del_file_action.triggered.connect(self.update_spec)
-        clear_action.triggered.connect(self.file_list.clear)
+        clear_action.triggered.connect(self.on_file_clear_action)
+        del_selected_action.triggered.connect(self.on_file_clear_action)
+        del_unselected_action.triggered.connect(self.on_file_clear_action)
+        del_unchecked_action.triggered.connect(self.on_file_clear_action)
 
         menu.exec(QtGui.QCursor.pos())
         
@@ -608,6 +591,47 @@ class Window(QMainWindow):
         else:
             self.bg_extra_check.setChecked(False)
         self.update_spec()
+
+    def on_file_clear_action(self,*args): 
+        """"Handle clearing (a subset of) files and spectra in response to an action."""
+        triggered_by = self.sender().text()
+        self.logger.info(f"Action fired: {triggered_by}")
+        match triggered_by:
+            case "Clear selected":
+                targets: list[SpectrumTreeItem]  = self.file_list.selectedItems()
+            case "Clear not selected":
+                targets: list[SpectrumTreeItem] = []
+                iterator = QTreeWidgetItemIterator(self.file_list,QTreeWidgetItemIterator.IteratorFlag.Unselected)
+                while iterator.value():
+                    item:SpectrumTreeItem = iterator.value()
+                    is_selected = item._is_selected_with_descendants() | item._is_selected_with_ancestors()
+                    if not is_selected:
+                        targets.append(item)
+                    iterator += 1
+            case "Clear not checked":
+                targets: list[SpectrumTreeItem] = []
+                iterator = QTreeWidgetItemIterator(self.file_list,QTreeWidgetItemIterator.IteratorFlag.NotChecked)
+                while iterator.value():
+                    item:SpectrumTreeItem = iterator.value()
+                    is_checked = item._is_checked_with_descendants() | item._is_checked_with_ancestors()
+                    if not is_checked:
+                        targets.append(item)
+                    iterator += 1
+            case "Clear all" | "Clear Files":
+                targets: list[SpectrumTreeItem] = [self.file_list.topLevelItem(i) for i in range(self.file_list.topLevelItemCount())]
+            case _:
+                targets = None
+        for item in targets:
+            current_index = self.file_list.indexFromItem(item)
+            if current_index.isValid():
+                self.file_list.itemFromIndex(current_index).remove()
+
+    def on_reload_file_action(self, file_item:SpectrumTreeItem):
+        file_item._data_has_been_loaded = False
+        file_item.clear_children()
+        self.plot_filetree_item(file_item)
+        self.update_spec_colors()
+
 
 
     def cont_fit_results_rightClick(self, cursor):
@@ -704,4 +728,3 @@ def run(app, splash):
     win.show()
     splash.finish(win)
     sys.exit(app.exec())
-    
