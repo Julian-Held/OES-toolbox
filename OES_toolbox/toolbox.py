@@ -291,11 +291,14 @@ class Window(QMainWindow):
         if event.key() == Qt.Key.Key_Delete:
             iterator = QTreeWidgetItemIterator(self.file_list,flags=QTreeWidgetItemIterator.IteratorFlag.Selected)
             root = self.file_list.invisibleRootItem()
+            targets = []
+            # Don't remove items in iterator since it changes the length/item index positions.
             while iterator.value():
                 this_item = iterator.value()
+                targets.append(this_item)
                 iterator += 1
-                self.logger.info(f"Removing {this_item.text(0)}")
-                (this_item.parent() or root).removeChild(this_item)
+            for t in targets:
+                t.remove()   
         else:
             QTreeWidget.keyPressEvent(self.file_list, event)
         event.accept()
