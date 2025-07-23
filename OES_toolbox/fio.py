@@ -77,8 +77,10 @@ class fio():
                     data = data.T
                 
                 try:
-                    np.savetxt(filename[0], data, header=header+table_header)
-                except:
+                    np.savetxt(filename[0], data, header=header+table_header, 
+                               encoding="utf-8")
+                except Exception as e:
+                    print(e) 
                     mb = QMessageBox()
                     mb.setIcon(QMessageBox.Icon.Information)
                     mb.setWindowTitle('Error')
