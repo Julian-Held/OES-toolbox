@@ -32,7 +32,8 @@ dependencies = [
     "sif-parser>=0.3.0",
     "pyarrow>=20.0.0",
     "xarray>=2025.4.0",
-    "h5netcdf>=1.6.0"
+    "h5netcdf>=1.6.0",
+    "charset-normalizer>=3.4.0",
 ]
 
 [project.scripts]

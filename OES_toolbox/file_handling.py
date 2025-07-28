@@ -13,6 +13,7 @@ from OES_toolbox import pyAvantes
 import numpy as np
 import pandas as pd
 import xarray as xr
+from charset_normalizer import is_binary, from_bytes, from_fp
 
 from typing import TYPE_CHECKING
 
@@ -33,19 +34,20 @@ class SpectraDataset:
         y (ArrayLike, ND)   :   The set of spectra recorded for `x`.
     """
 
-    def __init__(self,x:np.typing.ArrayLike,y:np.typing.ArrayLike, background:None|np.typing.ArrayLike=None):
+    def __init__(self,x:np.typing.ArrayLike,y:np.typing.ArrayLike, background:None|np.typing.ArrayLike=None, name:str="Spectrum"):
         self.x = x if isinstance(x,np.ndarray) else x.to_numpy()
         self.y = y if isinstance(y,np.ndarray) else y.to_numpy()
         self.background = background if background is not None else np.zeros_like(x)
         self.background = self.background if isinstance(self.background, np.ndarray) else self.background.to_numpy()
         self.has_background = not np.array_equal(self.background,np.zeros_like(self.x))
+        self.name = name
 
     @property
     def shape(self):
         return (self.y.shape)
     
     def __repr__(self):
-        return f"SpectraDataset(shape={self.shape}, has_background={self.has_background})"
+        return f"SpectraDataset(name={self.name}, shape={self.shape}, has_background={self.has_background})"
 
 class FileLoader:
     """The core class responsible for loading data.
@@ -55,13 +57,11 @@ class FileLoader:
     logger = Logger(instance=None, context={"class":"FileLoader"})
 
     @staticmethod
-    def is_binary_string(buffer: bytes) -> bool:
-        """Checks if string a binary buffer contains binary data, by stripping all ASCII and many control characters."""
-        textchars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
-        return bool(buffer.translate(None, textchars))
-
-    @staticmethod
     def _infer_text_schema_from_line(line: str) -> tuple[str, str]:
+        """Naively tries to infer the schema of a file from a single line.
+        
+        Only supports a small set of common column delimiters and decimal characters.
+        """
         delimiters = ["\t", ";", "|", ","]
         delim = next(d for d in delimiters if d in line)
         decimal_chars = [char for char in [",", "."] if char != delim]
@@ -69,20 +69,23 @@ class FileLoader:
         return delim, dec
 
     @classmethod
-    def _read_generic_text(cls, f: Path, verbose=False) -> pd.DataFrame:
+    def _read_generic_text(cls, f: Path) -> pd.DataFrame:
         pos = [0]
         line_num = 0
         header = None
         names = None
-        with f.open("r") as fo:
+        with f.open('rb') as fo:
+            enc = from_fp(fo).best().encoding
+        with f.open("r",encoding=enc) as fo:
             while line_num < 50:
                 line = fo.readline().strip()
                 if len(line) > 0:  # noqa: SIM102
                     if line[0].isdigit():  # first line with data
                         delim, dec = cls._infer_text_schema_from_line(line)
                         break
-                pos.append(fo.tell())
                 line_num += 1
+                pos.append(fo.tell())
+
             # determine header
             if line_num == 0:
                 goto = 0
@@ -103,23 +106,22 @@ class FileLoader:
                     names = [s.strip() for s in raw.split(delim)]
                     if np.unique(names).shape[0] < len(names):
                         names = None
+            
             fo.seek(goto)
-
-            if verbose:
-                print(f"{delim=}, {dec=},{line_num=},{goto=},{header=}, {names=}")
+            cls.logger.debug(f"{delim=}, {dec=},{line_num=},{goto=},{header=}, {names=}")
             try:
                 df = pd.read_csv(
-                    fo, sep=delim, decimal=dec, header=header, names=names, engine="pyarrow", on_bad_lines="error"
-                )
-            except pd.errors.ParserError:
+                    fo, sep=delim, decimal=dec, header=header, names=names, engine="pyarrow", on_bad_lines="error")
+            except pd.errors.ParserError as e :
                 # Fallback to the `C` parser when `pyarrow` fails
+                cls.logger.info(f"Parsing text file failed with `pyarrow` backend, falling back to `C` backend. \nError: {e}")
                 fo.seek(goto)
                 df = pd.read_csv(fo,sep=delim, decimal=dec, header=header, names=names,engine='c')
-        return df.dropna(axis=1, how="all").dropna(axis=0, ignore_index=True)
+        return df.dropna(axis=1, how="all").dropna(axis=0, ignore_index=True).astype(float)
 
     @classmethod
-    def read_avantes_txt(cls, f: Path, verbose=False) -> pd.DataFrame:
-        data = cls._read_generic_text(f, verbose=verbose)
+    def read_avantes_txt(cls, f: Path) -> pd.DataFrame:
+        data = cls._read_generic_text(f)
         return data
 
     @classmethod
@@ -139,8 +141,8 @@ class FileLoader:
         return data
 
     @classmethod
-    def read_andor_asc(cls, f: Path, verbose=False) -> pd.DataFrame:
-        data = cls._read_generic_text(f, verbose=verbose)
+    def read_andor_asc(cls, f: Path) -> pd.DataFrame:
+        data = cls._read_generic_text(f)
         return data
 
     @classmethod
@@ -158,6 +160,8 @@ class FileLoader:
         data_block_end = 0
         time_block_start = 0 
         with Path(f).open('rb') as fo:
+            enc = from_fp(fo).best().encoding
+            fo.seek(0)
             for i,line in enumerate(fo):
                 if b'Wavelength' in line:
                     wavelength_block_start = fo.tell()
@@ -171,7 +175,7 @@ class FileLoader:
                 line_num += 1
             last_line = i+1
             fo.seek(wavelength_block_start)
-            wavelength = np.fromstring(fo.readline().decode(),sep='\t')
+            wavelength = np.fromstring(fo.readline().decode(enc),sep='\t')
             fo.seek(data_block_start)
             y = pd.read_csv(
                 fo,
@@ -186,19 +190,19 @@ class FileLoader:
 
 
     @classmethod
-    def open_any_spectrum(cls, f: Path, sample_length=1024, verbose=False) -> list[SpectraDataset]:
+    def open_any_spectrum(cls, f: Path, sample_size=1024) -> list[SpectraDataset]:
         f = Path(f)
         time_start = time.perf_counter()
         with f.open("rb") as fo:
-            sample: bytes = fo.read(sample_length)
-        is_bin = cls.is_binary_string(sample)
+            sample: bytes = fo.read(sample_size)
+        is_bin:bool = is_binary(sample)
         ext = f.suffix
         if b"Data measured with spectrometer [name]:" in sample:
-            data = cls.read_avantes_txt(f, verbose=verbose)
+            data = cls.read_avantes_txt(f)
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
         elif b"AVS" in sample[:3]:
             data = cls.read_avantes_raw8(f)
-            spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
+            spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:], background=data.loc[:,'dark'].to_numpy())]
         elif b"Andor Technology Multi-Channel File" in sample:
             data = cls.read_andor_sif(f)
             x = data.calibration.to_numpy()
@@ -220,13 +224,14 @@ class FileLoader:
             spectra = []
             for name,roi in data.items():
                 d = roi.sum([dim for dim in roi.dims if dim not in [roi.wavelength.dims[0], roi.time.dims[0]]])
-                spectra.append(SpectraDataset(x=roi.wavelength,y=d.T))
+                bg = getattr(roi,'background',None)
+                spectra.append(SpectraDataset(x=roi.wavelength,y=d.T, background=bg, name=name))
         else:
-            data = cls._read_generic_text(f, verbose=verbose)
+            data = cls._read_generic_text(f)
             x = data.iloc[:, 0].to_numpy()
             y = data.iloc[:, 1:].to_numpy()
             spectra = [SpectraDataset(x=x,y=y)]
-        cls.logger.debug(f"Opening file took {(time.perf_counter()-time_start)*1e3:.2f} ms")
+        cls.logger.info(f"Read {f.name} in {(time.perf_counter()-time_start)*1e3:.2f} ms.")
         return spectra
 
 
