@@ -6,7 +6,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 import pyqtgraph as pg
 
-from OES_toolbox.file_handling import FileLoader
+from OES_toolbox.file_handling import FileLoader, SpectraDataset
 from OES_toolbox.logger import Logger
 
 
@@ -31,11 +31,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self._y = None
         self.bg = 0
         self.shift = 0
-        
-        if (self.path.is_dir()) or (not is_content):
-            self.setText(0, self.path.relative_to(self.path.joinpath("../").resolve()).as_posix())
-        else:
-            self.setText(0, label)
+    
+        self.setText(0,self.name())
         self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         self.setCheckState(0, Qt.CheckState.Unchecked)
         self._cb_shift = None
@@ -58,6 +55,13 @@ class SpectrumTreeItem(QTreeWidgetItem):
         answer = self.isSelected() if parent is None else (True is parent._is_selected_with_ancestors())
         return answer |  self.isSelected()
     
+    def name(self, shorten=False):
+        name_stem = f" {self.label}: {self.content_num}" if self.is_content else f"/{self.path.name}"
+        if shorten:
+            return name_stem.strip()
+        parent_name = f"{self.parent().name()}" if self.parent() is not None else ""
+        full_name =  f"{parent_name}{name_stem}".strip().strip("/")
+        return full_name
     
     @property
     def checked(self):
