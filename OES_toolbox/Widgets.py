@@ -185,19 +185,23 @@ class SpectrumTreeItem(QTreeWidgetItem):
         """Load data and add appropriate amount of children, if it is not too deeply nested."""
         
         if self.is_file:
-            self.logger.info(f"Reading file {self.path}")
             datasets = FileLoader.open_any_spectrum(self.path.resolve())
-            # print(f"Loaded {len(datasets)} datasets from {self.path.resolve()}")
             if len(datasets)>1:
                 for i,dataset in enumerate(datasets):
-                    child = SpectrumTreeItem(path=self.path,content_num=i,is_content=True, label='ROI')
-                    child._populate_with_data(dataset)
+                    child = SpectrumTreeItem(path=self.path,content_num=i,is_content=True, label=dataset.name)
                     self.addChild(child)
+                    child._populate_with_data(dataset)
             else:
                 self._populate_with_data(datasets[0])
             self._data_has_been_loaded = True
 
     def _populate_with_data(self,dataset:SpectraDataset):
+        """Add data from a SpectraDataset to this object.
+
+        If the SpectraDataset contains multiple spectra, add necessary child items to represent the data.
+        
+        Accounts for current wavelength shift set in the UI when adding spectra, but it must have been added to the TreeItemWidget container in advance, because `self.treeWidget()` otherwise returns `None`.
+        """
         x = dataset.x
         y = dataset.y
         tree = self.treeWidget()
