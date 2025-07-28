@@ -137,6 +137,7 @@ class FileLoader:
                 for _ in range(50):
                     if fo.readline().startswith(b"65539"):
                         calib = np.flip(list(map(float, fo.readline().split())))
+                        break
             data = data.assign_coords(calibration=("width", np.polyval(calib, data.width)))
         return data
 
