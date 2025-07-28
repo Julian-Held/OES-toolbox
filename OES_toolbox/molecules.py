@@ -305,16 +305,9 @@ class molecule_module():
                 
     def fit_filetree_item(self, this_item):
         """ Walks up the tree to assemble the path. """
-        path = []
-        current_parent = this_item.parent()
-        path.append(this_item.text(0))
-        while not current_parent is None:
-            path.append(current_parent.text(0))
-            current_item = current_parent
-            current_parent = current_item.parent()
-        path = os.path.join(self.mw.active_folder, *path[::-1])
-        x,y = self.mw.open_file(path, this_item)   
-        self.fit_spec(x+self.mw.wl_shift.value(),y,this_item.text(0))
+        self.mw.logger.info(f"Fitting: {this_item.name()}")
+        x,y = this_item.spectrum
+        self.fit_spec(x,y,this_item.name())
         
     
     def fit_spec(self,x,y,label):    
@@ -454,13 +447,16 @@ class molecule_module():
                     self.fit_spec(x,y, plot_item.name().replace('file:',''))
                     
         if self.mw.mol_fit_what_combobox.currentIndex() == 1: # fit all checked
-            iterator = QTreeWidgetItemIterator(self.mw.file_list)
+            iterator = QTreeWidgetItemIterator(self.mw.file_list,QTreeWidgetItemIterator.IteratorFlag.Checked)
             while iterator.value():
                 this_item = iterator.value()
                 iterator += 1
-                if this_item.checkState(0) == Qt.CheckState.Checked:
-                    self.fit_children(this_item)    
-        
+                # Fit only when not already fitted as child of parent
+                if this_item.parent() is not None:
+                    if not this_item.parent()._is_checked_with_ancestors():
+                        self.fit_children(this_item)
+                else:
+                    self.fit_children(this_item) 
 
     def clear_spec(self):
         for plot_item in self.mw.specplot.listDataItems():
