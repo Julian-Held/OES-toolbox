@@ -58,6 +58,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         answer = self.isSelected() if parent is None else (True is parent._is_selected_with_ancestors())
         return answer |  self.isSelected()
     
+    
     @property
     def checked(self):
         return self.checkState(0) == Qt.CheckState.Checked
@@ -90,7 +91,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     @property
     def spectrum(self):
-        return self.graph.getOriginalDataset()
+        return self.graph.getData()
 
     def set_spectrum(self, x, y, bg=None, **kwargs):
         name = kwargs.pop("name", None)
@@ -99,17 +100,19 @@ class SpectrumTreeItem(QTreeWidgetItem):
             self.label = name
         self._x = x[~np.isnan(x)]
         self._y = y[~np.isnan(y)]
-        self.bg = self.bg if bg is None else bg[~np.isnan(bg)]
-        self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=name, **kwargs)
+        # self.bg = self.bg if bg is None else bg[~np.isnan(bg)]
+        if bg is not None:
+            self.bg = bg if len(np.shape(bg))== 0 else bg[~np.isnan(bg)]     
+        self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
         self._data_has_been_loaded = True
 
     def set_background(self, bg):
         if self.childCount()==0:
-            if bg.shape == self._y.shape:
+            if (np.shape(bg) == np.shape(self._y)) or (len(np.shape(bg))==0):
                 self.bg = bg
                 self.graph.setData(self._x + self.shift, self._y - bg)
             else:
-                self.logger.info(f"Cannot set background, inapproriate shape: {bg.shape=} vs. {self._y.shape=}")
+                self.logger.info(f"Cannot set background, inapproriate shape: {np.shape(bg)=} vs. {np.shape(self._y)=}")
         else:
             for i in range(self.childCount()):
                 self.child(i).set_background(bg)
@@ -190,20 +193,20 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 self._populate_with_data(datasets[0])
             self._data_has_been_loaded = True
 
-    def _populate_with_data(self,dataset):
+    def _populate_with_data(self,dataset:SpectraDataset):
         x = dataset.x
         y = dataset.y
         tree = self.treeWidget()
         shift = tree.window().wl_shift.value() if tree is not None else 0
         if np.ndim(y)> 1 and np.shape(y)[0]>1:
             for i in range(y.shape[1]):
-                child = SpectrumTreeItem(self.path,label="Scan",content_num=i, is_content=True)
+                child = SpectrumTreeItem(self.path,label=dataset.name,content_num=i, is_content=True)
                 self.addChild(child)
                 child.set_spectrum(
                     x,
                     y[:,i],
                     shift=shift,
-                    name=f"file: {child.path.relative_to(self.path.parent.joinpath('../').resolve())} {child.label} {child.content_num}"
+                    bg = dataset.background
                 )
         elif np.ndim(y)>1:
             self.set_spectrum(x,y[0], shift=0, name=self.path.name)
