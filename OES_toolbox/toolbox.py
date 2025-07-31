@@ -514,8 +514,8 @@ class Window(QMainWindow):
 ##############################################################################
 
     def file_rightClick(self, cursor):
-        file_item = self.file_list.itemAt(cursor)
-        self.logger.debug(f"{file_item.label=}")
+        file_item: SpectrumTreeItem = self.file_list.itemAt(cursor)
+
         num = 0
         path = []
         if file_item.is_content:
@@ -541,9 +541,11 @@ class Window(QMainWindow):
         del_unchecked_action = QAction("Clear not checked")
         clear_action = QAction("Clear all")
         
-        if file_item.parent() is None:
+        if file_item.is_file & (not file_item.is_content):
             menu.addAction(reload_action)
             reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))
+            menu.addAction(del_file_action)
+            del_file_action.triggered.connect(file_item.remove)
 
         bg_atm = False
         if self.bg_extra_ledit.text() == path and self.bg_extra_check.isChecked():
@@ -561,15 +563,13 @@ class Window(QMainWindow):
         if file_item.childCount() == 0:
             menu.addAction(bg_action)
             
-        if file_item.is_content is False:
-            menu.addAction(del_file_action)
-            del_file_action.triggered.connect(file_item.remove)
         menu.addAction(del_selected_action)
         menu.addAction(del_unselected_action)
         menu.addAction(del_unchecked_action)
         menu.addAction(clear_action)
 
         bg_action.triggered.connect(lambda: self.file_rightclick_bg_action(path, bg_action.isChecked(), num))
+        bg_action.triggered.connect(lambda: self.on_set_background_action(file_item))
         clear_action.triggered.connect(self.on_file_clear_action)
         del_selected_action.triggered.connect(self.on_file_clear_action)
         del_unselected_action.triggered.connect(self.on_file_clear_action)
@@ -586,6 +586,14 @@ class Window(QMainWindow):
         else:
             self.bg_extra_check.setChecked(False)
         self.update_spec()
+
+    def on_set_background_action(self,item):
+        update_on_selected = self.plot_combobox.currentIndex() == 0
+        flag = QTreeWidgetItemIterator.IteratorFlag.Selected if update_on_selected else QTreeWidgetItemIterator.IteratorFlag.Checked
+        iterator =  QTreeWidgetItemIterator(self.file_list,flag)
+        while iterator.value():
+            iterator.value().set_background(item.y)
+            iterator += 1
 
     def on_file_clear_action(self,*args): 
         """"Handle clearing (a subset of) files and spectra in response to an action."""

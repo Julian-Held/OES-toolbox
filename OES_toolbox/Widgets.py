@@ -144,9 +144,10 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     def remove(self, *args):       
         if self.parent() is not None:
+            self.setSelected(False)
             self.remove_from_graph()
             self.parent().removeChild(self)
-            self.logger.debug(f"Removing {self}->{self.label}; children: {self.childCount()}")
+            self.logger.debug(f"Removing {self.name()}; children: {self.childCount()}")
         else:
             tree = self.treeWidget()
             tree.takeTopLevelItem(tree.indexOfTopLevelItem(self))
