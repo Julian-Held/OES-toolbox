@@ -117,16 +117,13 @@ class fio():
         folder = QFileDialog.getExistingDirectory(caption='Open Folder')
         if folder !="":
             if os.path.isdir(folder):
-                self.mw.file_list.clear()
+                # self.mw.file_list.clear()
                 self.active_folder = folder
 
-            spec_files = list(Path(self.active_folder).iterdir())
-            for f in spec_files:
-                if Path(f).suffix in [".png",".jpg",".ico",".svg",".ipynb",".py",".pyc"]:
-                    continue
-                item = self.mw.filetree_item(f)
-                item.iterdir()
-                self.mw.file_list.addTopLevelItem(item)
+            item = self.mw.filetree_item(folder)
+            self.mw.file_list.addTopLevelItem(item)
+            item.iterdir()
+            self.mw.file_list.expandItem(item)
             return folder
         
 
