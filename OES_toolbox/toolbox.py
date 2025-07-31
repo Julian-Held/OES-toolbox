@@ -381,14 +381,6 @@ class Window(QMainWindow):
 # <-------------------- Plotting measurement data -------------------------> #
 ##############################################################################
 
-    def update_spec_selected(self):
-        if self.plot_combobox.currentIndex() == 0: # plot selected
-            self.update_spec()
-
-    def update_spec_checkbox(self):
-        if self.plot_combobox.currentIndex() == 1:  # plot checked
-            self.update_spec()
-
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
         """Loads file and plots content. 
         
@@ -396,11 +388,11 @@ class Window(QMainWindow):
         """
         from OES_toolbox.file_handling import FileLoader
         self.logger.debug(f"{this_item.label}: {this_item._data_has_been_loaded=}")
-        if not this_item._data_has_been_loaded:
+        if (not this_item._data_has_been_loaded) & (this_item.is_file):
             path = this_item.path.resolve()
             this_item.load_data()            
             self.status_msg.setText(f"Loading file {path.name} complete!")
-        this_item.add_to_graph(self.specplot)               
+        this_item.add_to_graph(self.specplot)
                 
     def update_spec(self):
         """Checks which files are selected for plotting, loads and plots them."""
@@ -432,10 +424,10 @@ class Window(QMainWindow):
             selected = self.file_list.selectedItems()
             iterator = QTreeWidgetItemIterator(self.file_list, flags=QTreeWidgetItemIterator.IteratorFlag.Unselected)
             while iterator.value():
-                this_item = iterator.value()
+                this_item:SpectrumTreeItem = iterator.value()
                 iterator += 1
-                # self.specplot.removeItem(this_item.graph)
-                this_item.remove_from_graph(self.specplot)
+                if not this_item._is_selected_with_ancestors():
+                    this_item.remove_from_graph(self.specplot)
             for this_item in selected:
                 # if not this_item._data_has_been_loaded:
                 self.plot_filetree_item(this_item)
