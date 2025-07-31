@@ -81,7 +81,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     @x.setter
     def x(self, new: ArrayLike):
-        self._x = new[~np.isnan(new)]
+        self._x = new#[~np.isnan(new)]
         self.graph.setData(new + self.shift, self.y - self.bg)
 
     @property
@@ -90,7 +90,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     @y.setter
     def y(self, new: ArrayLike):
-        self._y = new[~np.isnan(new)]
+        self._y = new#[~np.isnan(new)]
         self.graph.setData(self.x + self.shift, new - self.bg)
 
     @property
@@ -102,11 +102,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self.shift = kwargs.pop("shift", 0)
         if name:
             self.label = name
-        self._x = x[~np.isnan(x)]
-        self._y = y[~np.isnan(y)]
+        self._x = x#[~np.isnan(x)]
+        self._y = y#[~np.isnan(y)]
         # self.bg = self.bg if bg is None else bg[~np.isnan(bg)]
         if bg is not None:
-            self.bg = bg if len(np.shape(bg))== 0 else bg[~np.isnan(bg)]     
+            self.bg = bg if len(np.shape(bg))== 0 else bg#[~np.isnan(bg)]     
         self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
         self._data_has_been_loaded = True
 
@@ -157,8 +157,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
         if self.childCount()==0:
             new = sender.value() if not isinstance(sender,float) else sender
             self.shift = new
-            if self._x is not None:
-                self.graph.setData(self._x + new, self._y - self.bg, skipFiniteCheck=True)
+            if self.x is not None:
+                self.graph.setData(self.x + new, self.y - self.bg, skipFiniteCheck=True)
 
     def clear_tree(self):
         tree = self.treeWidget()
@@ -206,7 +206,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         y = dataset.y
         tree = self.treeWidget()
         shift = tree.window().wl_shift.value() if tree is not None else 0
-        if np.ndim(y)> 1 and np.shape(y)[0]>1:
+        if np.ndim(y)> 1:
             for i in range(y.shape[1]):
                 child = SpectrumTreeItem(self.path,label=dataset.name,content_num=i, is_content=True)
                 self.addChild(child)
@@ -216,7 +216,6 @@ class SpectrumTreeItem(QTreeWidgetItem):
                     shift=shift,
                     bg = dataset.background
                 )
-        elif np.ndim(y)>1:
-            self.set_spectrum(x,y[0], shift=0, name=self.path.name)
         else:
-            self.set_spectrum(x,y,shift=0,name=self.path.name)
+            self.set_spectrum(x,y,shift=shift,name=self.path.name)
+        self._data_has_been_loaded = True
