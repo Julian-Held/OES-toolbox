@@ -6,6 +6,7 @@ Whenever a new file-type needs to be supported, this is the place to start.
 from pathlib import Path
 import importlib.util
 import time
+import re
 from PyQt6.QtGui import QImage
 from matplotlib.figure import Figure
 import sif_parser
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from xarray import DataArray,Dataset
+    from numpy.typing import NDArray,ArrayLike
 
 from OES_toolbox.logger import Logger
 
@@ -62,62 +64,73 @@ class FileLoader:
         
         Only supports a small set of common column delimiters and decimal characters.
         """
-        delimiters = ["\t", ";", "|", ","]
+        delimiters = ["\t", ";", "|", " ",","] # put comma last to priorize the others due to ambiguity based on locale
         delim = next(d for d in delimiters if d in line)
         decimal_chars = [char for char in [",", "."] if char != delim]
         dec = next((d for d in decimal_chars if d in line.replace(delim, "")), ".")
         return delim, dec
+    
+    @staticmethod
+    def _parse_open_text_file(handle,offset,sep:str=",",decimal:str=".",names: list|None=None, **kwargs)-> pd.DataFrame:
+        """Read the data block from an already opened text file.
+        
+        Will drop all columns that are filled with NaN values and cast all data to float.
+        
+        Designed to only reading the data block (e.g. numeric data), no header etc.
 
+        Additional kwargs will be passed to `pandas.read_csv`, to customize read behaviour.
+        
+        Args:
+            handle  : the handle of the opened file object
+            offset  : The offset to start reading from.
+            sep     : The separator/delimiter of the data
+            decimal : The decimal character
+            names   : Optional names for the columns.
+        """
+        header = kwargs.pop('header', None)
+        engine = kwargs.pop('engine', 'pyarrow')        
+        current_pos = handle.tell()
+        handle.seek(offset)
+        df = pd.read_csv(handle,sep=sep,decimal=decimal,names=names, header=header, engine=engine, **kwargs)
+        handle.seek(current_pos)
+        return df.dropna(axis=1,how='all').astype(float)
+    
     @classmethod
     def _read_generic_text(cls, f: Path) -> pd.DataFrame:
-        pos = [0]
-        line_num = 0
-        header = None
-        names = None
-        with f.open('rb') as fo:
+        """Infer the format and read from a generic text file.
+        
+        Intedend as a catch-all reader for any text format that does not require bespoke parsing.
+        """
+        f = Path(f)
+        with f.open("rb") as fo:
             enc = from_fp(fo).best().encoding
-        with f.open("r",encoding=enc) as fo:
+        with f.open("r", encoding=enc) as fo:
+            pos = []
+            line_num = 0
             while line_num < 50:
+                cursor = fo.tell()
+                pos.append(cursor)
                 line = fo.readline().strip()
-                if len(line) > 0:  # noqa: SIM102
-                    if line[0].isdigit():  # first line with data
-                        delim, dec = cls._infer_text_schema_from_line(line)
-                        break
+                if line and line[0].isdigit():  # first line with data
+                    sep, decimal = cls._infer_text_schema_from_line(line)
+                    offset_data = cursor
+                    line_num_data = line_num
+                    break
                 line_num += 1
-                pos.append(fo.tell())
-
-            # determine header
-            if line_num == 0:
-                goto = 0
-            else:
-                goto = pos[-2]
-                fo.seek(goto)
-                raw = fo.readline()
-                if raw.strip() == "":
-                    fo.seek(pos[-4])
-                    raw = fo.readline()
-                    goto = pos[-1]
-                if delim not in raw:
-                    header = None
-                    names = None
-                    goto = pos[-1]
-                else:
-                    header = 0 if goto == pos[-2] else None
-                    names = [s.strip() for s in raw.split(delim)]
-                    if np.unique(names).shape[0] < len(names):
-                        names = None
+            cls.logger.debug(f"{f.name}: {enc}, {sep=}, {decimal=}, {offset_data=}")
+            df = cls._parse_open_text_file(fo,offset_data,sep,decimal, on_bad_lines='skip')
+            # determine column names if any
+            fo.seek(pos[pos.index(offset_data)-1])
+            heading_line = fo.readline().strip()
+            if heading_line =="":
+                fo.seek(pos[pos.index(offset_data)-2])
+                heading_line = fo.readline().strip()
             
-            fo.seek(goto)
-            cls.logger.debug(f"{delim=}, {dec=},{line_num=},{goto=},{header=}, {names=}")
-            try:
-                df = pd.read_csv(
-                    fo, sep=delim, decimal=dec, header=header, names=names, engine="pyarrow", on_bad_lines="error")
-            except pd.errors.ParserError as e :
-                # Fallback to the `C` parser when `pyarrow` fails
-                cls.logger.info(f"Parsing text file failed with `pyarrow` backend, falling back to `C` backend. \nError: {e}")
-                fo.seek(goto)
-                df = pd.read_csv(fo,sep=delim, decimal=dec, header=header, names=names,engine='c')
-        return df.dropna(axis=1, how="all").dropna(axis=0, ignore_index=True).astype(float)
+            if sep in heading_line:
+                names = [part.strip() for part in heading_line.split(sep) if part.strip()!=""]
+                if (len(names)==df.shape[1]) & (np.unique(names).shape[0]==len(names)):
+                    df.columns = names
+            return df
 
     @classmethod
     def read_avantes_txt(cls, f: Path) -> pd.DataFrame:
@@ -130,7 +143,35 @@ class FileLoader:
         return data
 
     @classmethod
-    def read_andor_sif(cls, f: Path)->"DataArray":
+    def read_andor_sif(cls, f: Path)->tuple["NDArray[float]","NDArray[float]"]:
+        """Read a `*.sif` file such as created by Andor SOLIS software, using the `sif_parser` package, into a numpy arrays.
+        
+        Requires a more recent version of `sif_parser` than 0.3.5 to properly extract wavelength axis for step-and-glue or older formats.
+
+        However, contains a crude patch to retrieve the calibration for version 0.3.5 for some files
+        """
+        # data = sif_parser.xr_open(f)
+        data, meta = sif_parser.np_open(f)
+        wl = sif_parser.utils.extract_calibration(meta)
+        if (wl is None) or (np.shape(data)[-1]!=np.shape(wl)[-1]):
+            with f.open("rb") as fo:
+                for _ in range(50):
+                    if fo.readline().startswith(b"65539"):
+                        calib = np.flip(list(map(float, fo.readline().split())))
+                        break
+            wl = np.polyval(calib,np.arange(1,meta['ImageLength']+1))
+
+        print(f"{np.shape(data)=} {np.shape(wl)=}, {meta['ImageLength']}")
+        return wl,data
+    
+    @classmethod
+    def read_andor_sif_xarray(cls, f: Path)->"DataArray":
+        """Read a `*.sif` file such as created by Andor SOLIS software, using the `sif_parser` package, into an xarray DataArray.
+        
+        Requires a more recent version of `sif_parser` than 0.3.5 to properly extract wavelength axis for step-and-glue or older formats.
+
+        However, contains a crude patch to retrieve the calibration for version 0.3.5 for some files
+        """
         data = sif_parser.xr_open(f)
         if "calibration" not in data.coords:
             with f.open("rb") as fo:
@@ -138,7 +179,7 @@ class FileLoader:
                     if fo.readline().startswith(b"65539"):
                         calib = np.flip(list(map(float, fo.readline().split())))
                         break
-            data = data.assign_coords(calibration=("width", np.polyval(calib, data.width)))
+            data = data.assign_coords(calibration=("width", np.polyval(calib, np.arange(1,data.ImageLength+1))))
         return data
 
     @classmethod
@@ -156,36 +197,29 @@ class FileLoader:
         
     
     @classmethod
-    def read_horiba_txt(cls,f:Path) -> tuple[np.typing.ArrayLike,pd.DataFrame]:
-        line_num=0
-        data_block_end = 0
-        time_block_start = 0 
+    def read_horiba_txt(cls,f:Path) -> tuple["ArrayLike",pd.DataFrame]:
+        f = Path(f)
+        time_block_start = 0
+        sep = "\t" # assumed constant
+        decimal = "." # assume data in of type int, thus does not matter
         with Path(f).open('rb') as fo:
             enc = from_fp(fo).best().encoding
             fo.seek(0)
-            for i,line in enumerate(fo):
+            for line in fo:
                 if b'Wavelength' in line:
                     wavelength_block_start = fo.tell()
                 elif b'Raw Intensity' in line:
                     data_block_start = fo.tell()
-                elif (line.startswith(b"*")) & (data_block_end==0):
-                    data_block_end = fo.tell()
-                    data_block_end_line = i
                 elif (line.startswith(b'[')) & (time_block_start==0):
                     time_block_start = fo.tell()
-                line_num += 1
-            last_line = i+1
+                    break # done with finding blocks in file
             fo.seek(wavelength_block_start)
-            wavelength = np.fromstring(fo.readline().decode(enc),sep='\t')
-            fo.seek(data_block_start)
-            y = pd.read_csv(
-                fo,
-                sep='\t', 
-                engine='python', 
-                skipfooter=last_line-data_block_end_line,
-                header=None
-                ).dropna(axis=1).T
-            
+            wavelength = np.fromstring(fo.readline().decode(enc),sep= sep)
+            y = cls._parse_open_text_file(fo,data_block_start,sep=sep,decimal=decimal, on_bad_lines="skip").T
+            expr = re.compile(r"\[([\d\.\,]+)\]")
+            fo.seek(time_block_start)
+            timestamps = np.unique(np.fromiter(map(float, expr.findall(fo.read(-1).decode(enc))), float))
+        cls.logger.debug(f"{f.name}: {data_block_start=},{wavelength_block_start=}, {time_block_start=}")
         return wavelength,y
         
 
@@ -197,7 +231,7 @@ class FileLoader:
         with f.open("rb") as fo:
             sample: bytes = fo.read(sample_size)
         is_bin:bool = is_binary(sample)
-        ext = f.suffix
+        ext = f.suffix.lower()
         if b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
@@ -206,8 +240,7 @@ class FileLoader:
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:], background=data.loc[:,'dark'].to_numpy())]
         elif b"Andor Technology Multi-Channel File" in sample:
             data = cls.read_andor_sif(f)
-            x = data.calibration.to_numpy()
-            spectra = [SpectraDataset(x=x,y=data.data.T.reshape(x.shape[0], -1))]
+            spectra = [SpectraDataset(x=data[0],y=data[1].sum(axis=1).T)]
         elif is_bin & (ext == ".spe"):
             raise NotImplementedError()
             data:xr.Dataset = None
@@ -232,7 +265,7 @@ class FileLoader:
             x = data.iloc[:, 0].to_numpy()
             y = data.iloc[:, 1:].to_numpy()
             spectra = [SpectraDataset(x=x,y=y)]
-        cls.logger.info(f"Read {f.name} in {(time.perf_counter()-time_start)*1e3:.2f} ms.")
+        cls.logger.info(f"Read '{f.name}' (size: {f.stat().st_size*1e-6:.3f} MB) in {(time.perf_counter()-time_start)*1e3:.2f} ms.")
         return spectra
 
 

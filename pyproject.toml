@@ -29,7 +29,7 @@ dependencies = [
     "owlspec>=0.3.0",
     "PyQt6>=6.5.0",
     "pyqtgraph>=0.13.1",
-    "sif-parser>=0.3.0",
+    "sif-parser>=0.3.5",
     "pyarrow>=20.0.0",
     "xarray>=2025.4.0",
     "h5netcdf>=1.6.0",
@@ -76,6 +76,12 @@ path = "build-exe.py"
 installer = "uv"
 extra-dependencies = ["ipykernel","ipython"]
 
+[tool.hatch.envs.hatch-test]
+parallel = false
+extra-dependencies = ["hypothesis"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.10", "3.11","3.12","3.13"]
 
 [tool.ruff]
 line-length=120
@@ -87,3 +93,8 @@ exclude = ["*.py"]
 [tool.ruff.lint]
 extend-ignore = ["F401","E402","D"]
 extend-select = ["E4", "E7", "E9", "F","C4", "SIM", "NPY", "PD","B","UP"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]

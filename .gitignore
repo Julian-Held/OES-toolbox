@@ -61,3 +61,6 @@ target/
 # Local development files and folders
 /.ruff_cache
 OES_toolbox/_version.py
+.pytest_cache
+.hypothesis
+tests/test_files/tests_*
