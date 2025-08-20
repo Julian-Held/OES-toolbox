@@ -504,7 +504,7 @@ class Window(QMainWindow):
 
     def filetree_item(self, path, is_content=False, num=0, label="Scan"): # TODO: should really be a class
         path = Path(path)
-        item = SpectrumTreeItem(path = path, label=f"{label} {num}", content_num=num, is_content=is_content)
+        item = SpectrumTreeItem(path = path, label=f"{label} {num}", content_num=None, is_content=is_content)
         return item
     
 
@@ -515,26 +515,13 @@ class Window(QMainWindow):
     def file_rightClick(self, cursor):
         file_item: SpectrumTreeItem = self.file_list.itemAt(cursor)
 
-        num = 0
-        path = []
-        if file_item.is_content:
-            current_parent =  file_item.parent().parent()
-            path.append(file_item.parent().text(0))
-            num = file_item.content_num
-        else:
-            current_parent = file_item.parent()
-            path.append(file_item.text(0))
-            
-        while current_parent is not None:
-            path.append(current_parent.text(0))
-            current_item = current_parent
-            current_parent = current_item.parent()
-        path = os.path.join(self.io.active_folder, *path[::-1])
+        num = file_item.content_num
+        path = file_item.path.resolve().as_posix()
 
         menu = QMenu()
         reload_action = QAction("Reload this file")
         bg_action = QAction("Use as background", checkable=True)
-        del_file_action = QAction("Clear this file")
+        del_this_action = QAction("Clear this item")
         del_selected_action = QAction("Clear selected")
         del_unselected_action = QAction("Clear not selected")
         del_unchecked_action = QAction("Clear not checked")
@@ -544,33 +531,26 @@ class Window(QMainWindow):
         if file_item.is_file_node_item:
             menu.addAction(reload_action)
             reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))
-            menu.addAction(del_file_action)
-            del_file_action.triggered.connect(file_item.remove)
-
-        bg_atm = False
-        if self.bg_extra_ledit.text() == path and self.bg_extra_check.isChecked():
-            if not file_item.is_content:
-                bg_atm = True
-            else:
-                if self.bg_extra_ledit.num == file_item.content_num:
-                    bg_atm = True
-
-        if bg_atm:
-            bg_action.setChecked(True)
-        else:
-            bg_action.setChecked(False)
+        
+        # TODO: revisit this for internal vs external background switching    
+        could_be_bg = True if not file_item.is_content else self.bg_extra_ledit.num==file_item.content_num
+        bg_atm = False if not (self.bg_extra_ledit.text()==path and self.bg_extra_check.isChecked()) else could_be_bg
+        self.logger.debug(f"{self.bg_extra_ledit.text()=} -> num = {num} ->\t{bg_atm=}") # file path and index of external background
+        bg_action.setChecked(bg_atm)
 
         if file_item.childCount() == 0:
             menu.addAction(bg_action)
-            
-        menu.addAction(del_selected_action)
-        menu.addAction(del_unselected_action)
-        menu.addAction(del_unchecked_action)
-        menu.addAction(clear_action)
+        menu_clear = menu.addMenu("Clear...")
+        menu_clear.addAction(del_this_action)
+        menu_clear.addAction(del_selected_action)
+        menu_clear.addAction(del_unselected_action)
+        menu_clear.addAction(del_unchecked_action)
+        menu_clear.addAction(clear_action)
 
         bg_action.triggered.connect(lambda: self.file_rightclick_bg_action(path, bg_action.isChecked(), num))
         bg_action.triggered.connect(lambda: self.on_set_background_action(file_item))
         clear_action.triggered.connect(self.on_file_clear_action)
+        del_this_action.triggered.connect(file_item.remove)
         del_selected_action.triggered.connect(self.on_file_clear_action)
         del_unselected_action.triggered.connect(self.on_file_clear_action)
         del_unchecked_action.triggered.connect(self.on_file_clear_action)
