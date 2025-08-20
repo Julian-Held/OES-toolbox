@@ -382,16 +382,15 @@ class Window(QMainWindow):
 ##############################################################################
 
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
-        """Loads file and plots content. 
-        
-        Walks up the tree to assemble the path.
-        """
-        from OES_toolbox.file_handling import FileLoader
-        self.logger.debug(f"{this_item.label}: {this_item._data_has_been_loaded=}")
-        if (not this_item._data_has_been_loaded) & (this_item.is_file):
-            path = this_item.path.resolve()
-            this_item.load_data()            
-            self.status_msg.setText(f"Loading file {path.name} complete!")
+        """Loads file and plots content."""
+        self.logger.debug(f"{this_item.label}: {this_item.is_loaded=}")
+        if (not this_item.is_loaded) & (this_item.is_file):
+            try:
+                this_item.load_data()
+            except (AttributeError,UnboundLocalError):
+                self.status_msg.setText(f"Could not load data from {this_item.path.name}")
+                return
+            self.status_msg.setText(f"Loading file {this_item.path.name} complete!")
         this_item.add_to_graph(self.specplot)
                 
     def update_spec(self):
@@ -541,7 +540,8 @@ class Window(QMainWindow):
         del_unchecked_action = QAction("Clear not checked")
         clear_action = QAction("Clear all")
         
-        if file_item.is_file & (not file_item.is_content):
+        # if file_item.is_file & (not file_item.is_content):
+        if file_item.is_file_node_item:
             menu.addAction(reload_action)
             reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))
             menu.addAction(del_file_action)
@@ -630,7 +630,7 @@ class Window(QMainWindow):
                 self.file_list.itemFromIndex(current_index).remove()
 
     def on_reload_file_action(self, file_item:SpectrumTreeItem):
-        file_item._data_has_been_loaded = False
+        file_item.is_loaded = False
         file_item.clear_children()
         self.plot_filetree_item(file_item)
         self.update_spec_colors()

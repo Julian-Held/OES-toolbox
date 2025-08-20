@@ -17,7 +17,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
     ignored_prefix = ["_","."]
     logger = Logger(instance=None, context={"class":"SpectrumTreeItem"})
 
-    def __init__(self,path: Path, label: str, content_num: int, is_content: bool = True):
+    def __init__(self,path: Path, label: str, content_num: int|None=None, is_content: bool = True,**kwargs):
         
         super().__init__(None)
         self.path = Path(path)
@@ -25,11 +25,14 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self.content_num = content_num
         self.is_content = is_content
 
+        self._x = kwargs.pop("x",None)
+        self._y = kwargs.pop("y",None)
+        self.bg = kwargs.pop('bg',0 if self._y is not None else None)
+
         self.graph = pg.PlotDataItem(x=np.zeros(1), y=np.zeros(1), name=self.label, skipFiniteCheck=True)
         self._data_has_been_loaded = False
-        self._x = None
-        self._y = None
-        self.bg = 0
+        
+        
         self.shift = 0
     
         self.setText(0,self.name())
@@ -56,11 +59,22 @@ class SpectrumTreeItem(QTreeWidgetItem):
         return answer |  self.isSelected()
     
     def name(self, shorten=False):
-        name_stem = f" {self.label}: {self.content_num}" if self.is_content else f"/{self.path.name}"
+        if self.is_dir:
+            name_stem = f"/{self.path.name}"
+        elif self.is_content:
+            if self.is_file_node_item and (self.label=="") or self.label == self.path.name:
+                name_stem = f"/{self.path.name}"
+            else:
+                name_stem = f": {self.label} {self.content_num if self.content_num is not None else ''}"
+        elif (self.is_file & self.is_file_node_item):
+            name_stem = f"/{self.path.name}"
+        else:
+            name_stem = f"{self.label}"
+
         if shorten:
             return name_stem.strip()
         parent_name = f"{self.parent().name()}" if self.parent() is not None else ""
-        full_name =  f"{parent_name}{name_stem}".strip().strip("/")
+        full_name =  f"{parent_name}{name_stem}".strip().strip("/").strip(":")
         return full_name
     
     @property
@@ -96,6 +110,33 @@ class SpectrumTreeItem(QTreeWidgetItem):
     @property
     def spectrum(self):
         return self.graph.getData()
+    
+    @property
+    def is_loaded(self):
+        return self._data_has_been_loaded
+    
+    @is_loaded.setter
+    def is_loaded(self, state:bool):
+        self._data_has_been_loaded = state
+        if state & self.is_file_node_item:
+            self.setIcon(0,qta.icon("mdi6.file-outline","mdi6.check-bold", color="black"))
+
+    @property
+    def is_file_node_item(self):
+        """Property to flag if a node in the tree is at the 'file-level', rather than more deeply nested.
+        
+        The property `self.is_file` will be `True` for any node with data (for multidimensional data).
+        As a consequence, it does not work to distinguish between nodes that point to files, and nodes that point to data in a file.
+
+        However, for any top level file, the parent (if present) will be a dir, or (if no parent present), it *would be* a dir.
+
+        Note that for this to work reliably, self must be added to either a parent or a TreeItemWidget.
+        """
+        if self.is_dir:
+            return False
+        is_parent_a_dir = self.parent().is_dir if self.parent() is not None else True
+        return (not self.is_content) or is_parent_a_dir
+        
 
     def set_spectrum(self, x, y, bg=None, **kwargs):
         name = kwargs.pop("name", None)
@@ -108,7 +149,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         if bg is not None:
             self.bg = bg if len(np.shape(bg))== 0 else bg#[~np.isnan(bg)]     
         self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
-        self._data_has_been_loaded = True
+        self.is_loaded = True
 
     def set_background(self, bg):
         if self.childCount()==0:
@@ -175,10 +216,10 @@ class SpectrumTreeItem(QTreeWidgetItem):
     def iterdir(self):
         if self.path.is_dir():
             self.logger.debug(f"Iterating over dir={self.path}")
-            for f in self.path.iterdir():
+            for f in sorted(self.path.iterdir(), key=lambda p: (p.is_file(),p.stem.lower())):
                 if (f.suffix in self.ignored_files) | (f.name[0] in self.ignored_prefix):
                     continue
-                subitem = SpectrumTreeItem(path=f, label=f.name, content_num=0, is_content=self.is_content, )
+                subitem = SpectrumTreeItem(path=f, label=f.name, is_content=self.is_content, )
                 self.addChild(subitem)
                 subitem.iterdir()
 
@@ -186,17 +227,20 @@ class SpectrumTreeItem(QTreeWidgetItem):
         """Load data and add appropriate amount of children, if it is not too deeply nested."""
         
         if self.is_file:
-            datasets = FileLoader.open_any_spectrum(self.path.resolve())
+            try:
+                datasets = FileLoader.open_any_spectrum(self.path.resolve())
+            except (AttributeError,UnboundLocalError) as e:
+                raise e
             if len(datasets)>1:
-                for i,dataset in enumerate(datasets):
-                    child = SpectrumTreeItem(path=self.path,content_num=i,is_content=True, label=dataset.name)
+                for _i,dataset in enumerate(datasets):
+                    child = SpectrumTreeItem(path=self.path,is_content=True, label=dataset.name)
                     self.addChild(child)
-                    child._populate_with_data(dataset)
+                    child._populate_with_data(dataset, label="spectrum")
             else:
-                self._populate_with_data(datasets[0])
-            self._data_has_been_loaded = True
+                self._populate_with_data(datasets[0], label="spectrum")
+            self.is_loaded = True
 
-    def _populate_with_data(self,dataset:SpectraDataset):
+    def _populate_with_data(self,dataset:SpectraDataset, label=None):
         """Add data from a SpectraDataset to this object.
 
         If the SpectraDataset contains multiple spectra, add necessary child items to represent the data.
@@ -209,7 +253,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         shift = tree.window().wl_shift.value() if tree is not None else 0
         if np.ndim(y)> 1:
             for i in range(y.shape[1]):
-                child = SpectrumTreeItem(self.path,label=dataset.name,content_num=i, is_content=True)
+                child = SpectrumTreeItem(self.path,label=dataset.name if label is None else label,content_num=i, is_content=True)
                 self.addChild(child)
                 child.set_spectrum(
                     x,
@@ -217,6 +261,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                     shift=shift,
                     bg = dataset.background
                 )
+            self.is_loaded = True
         else:
-            self.set_spectrum(x,y,shift=shift,name=self.path.name)
-        self._data_has_been_loaded = True
+            self.is_content = True # needed to force non-nested files to plot their data, without adding a child node.
+            self.set_spectrum(x,y,shift=shift,bg=dataset.background,name=None)
