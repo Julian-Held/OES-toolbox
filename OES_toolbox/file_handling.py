@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from charset_normalizer import is_binary, from_bytes, from_fp
-
+from spexread.parsing import read_spe_file
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -36,9 +36,11 @@ class SpectraDataset:
         y (ArrayLike, ND)   :   The set of spectra recorded for `x`.
     """
 
-    def __init__(self,x:np.typing.ArrayLike,y:np.typing.ArrayLike, background:None|np.typing.ArrayLike=None, name:str="Spectrum"):
+    def __init__(self,x:np.typing.ArrayLike,y:np.typing.ArrayLike, background:None|np.typing.ArrayLike=None, name:str="spectrum"):
         self.x = x if isinstance(x,np.ndarray) else x.to_numpy()
         self.y = y if isinstance(y,np.ndarray) else y.to_numpy()
+        if np.ndim(self.y)>1:
+            self.y = self.y.reshape(-1) if np.shape(self.y)[1]<2 else self.y
         self.background = background if background is not None else np.zeros_like(x)
         self.background = self.background if isinstance(self.background, np.ndarray) else self.background.to_numpy()
         self.has_background = not np.array_equal(self.background,np.zeros_like(self.x))
@@ -143,7 +145,7 @@ class FileLoader:
         return data
 
     @classmethod
-    def read_andor_sif(cls, f: Path)->tuple["NDArray[float]","NDArray[float]"]:
+    def read_andor_sif(cls, f: Path)->tuple["NDArray","NDArray"]:
         """Read a `*.sif` file such as created by Andor SOLIS software, using the `sif_parser` package, into a numpy arrays.
         
         Requires a more recent version of `sif_parser` than 0.3.5 to properly extract wavelength axis for step-and-glue or older formats.
@@ -188,8 +190,8 @@ class FileLoader:
         return data
 
     @classmethod
-    def read_PI_spe(cls, f: Path)->"Dataset":
-        raise NotImplementedError
+    def read_PI_spe(cls, f: Path)->list["DataArray"]:
+        return read_spe_file(f,as_dataset=False)
 
     @classmethod
     def read_netCDF(cls, f:Path):
@@ -220,7 +222,7 @@ class FileLoader:
             fo.seek(time_block_start)
             timestamps = np.unique(np.fromiter(map(float, expr.findall(fo.read(-1).decode(enc))), float))
         cls.logger.debug(f"{f.name}: {data_block_start=},{wavelength_block_start=}, {time_block_start=}")
-        return wavelength,y
+        return wavelength,y, timestamps
         
 
 
@@ -237,21 +239,18 @@ class FileLoader:
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
         elif b"AVS" in sample[:3]:
             data = cls.read_avantes_raw8(f)
-            spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:], background=data.loc[:,'dark'].to_numpy())]
+            spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.loc[:, 'scope'], background=data.loc[:,'dark'].to_numpy())]
         elif b"Andor Technology Multi-Channel File" in sample:
             data = cls.read_andor_sif(f)
             spectra = [SpectraDataset(x=data[0],y=data[1].sum(axis=1).T)]
         elif is_bin & (ext == ".spe"):
-            raise NotImplementedError()
-            data:xr.Dataset = None
-            dim_name_wavelength = data.wavelength.dims[0]
-            dim_name_others = [name for name in data.dims if name not in data.wavelength.dims]
+            data:xr.Dataset = cls.read_PI_spe(f)
             spectra = []
-            for name, roi in data.items():
-                d = roi.dropna(dim_name_wavelength,how='all').mean(dim_name_others)
-                spectra.append(SpectraDataset(x=d.wavelength,y=d.data))
+            for d in data:
+                other_dim = [name for name in ['x','y'] if name not in d.wavelength.dims]
+                spectra.append(SpectraDataset(x=d.wavelength,y=d.mean(other_dim).data.T, name=d.name))
         elif b"OESi Camera" in sample:
-            x,y = cls.read_horiba_txt(f)
+            x,y,_ = cls.read_horiba_txt(f)
             spectra = [SpectraDataset(x=x,y=y)]
         elif is_bin & (ext=='.nc'):
             data = cls.read_netCDF(f)
