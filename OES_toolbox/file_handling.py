@@ -296,8 +296,8 @@ class FileExport:
                 case "nopen":
                     style_kws['ls']=''
             if plot_item.name().startswith("file"):
-                style_kws["label"]="measurement"
-            elif plot_item.name().startswith("cont"):
+                style_kws["label"]=plot_item.name().strip("file:").strip()
+            if plot_item.name().startswith("cont"):
                 style_kws["lw"] = 1
             elif plot_item.name().startswith('NIST'):
                 style_kws["lw"] = 0.5
@@ -306,7 +306,8 @@ class FileExport:
             count += 1
         plt.xlim(xlim)
         plt.ylim(ylim)
-        if count>1:
+        # if count>1:
+        if graph.plotItem.legend.isVisible():
             plt.legend()
         plt.xlabel("Wavelength / nm")
         plt.ylabel("Intensity")

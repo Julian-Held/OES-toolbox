@@ -767,6 +767,13 @@
             </property>
            </spacer>
           </item>
+<item>
+           <widget class="QCheckBox" name="check_HideLegend">
+            <property name="text">
+             <string>Hide legend</string>
+            </property>
+           </widget>
+          </item>
           <item>
            <widget class="QProgressBar" name="progress_bar">
             <property name="enabled">

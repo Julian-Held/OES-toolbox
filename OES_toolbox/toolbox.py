@@ -234,6 +234,10 @@ class Window(QMainWindow):
         layout.addWidget(self.rh_button)
         rhandle.setLayout(layout)
 
+        self.check_HideLegend.checkStateChanged.connect(
+            lambda state: self.specplot.plotItem.legend.setVisible(state != Qt.CheckState.Checked)
+        )
+
 
 ##############################################################################
 # <-------------------- basic/general UI function -------------------------> #
