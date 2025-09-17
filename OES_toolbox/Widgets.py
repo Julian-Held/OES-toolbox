@@ -25,9 +25,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self.content_num = content_num
         self.is_content = is_content
 
+        self._internal_bg = 0 # placeholder for actual internal backgrounds
+        self._external_bg = 0
         self._x = kwargs.pop("x",None)
         self._y = kwargs.pop("y",None)
-        self.bg = kwargs.pop('bg',0 if self._y is not None else None)
+        # self.bg = kwargs.pop('bg',0 if self._y is not None else None)
 
         self.graph = pg.PlotDataItem(x=np.zeros(1), y=np.zeros(1), name=self.label, skipFiniteCheck=True)
         self._data_has_been_loaded = False
@@ -93,19 +95,32 @@ class SpectrumTreeItem(QTreeWidgetItem):
     def x(self):
         return self._x
 
-    @x.setter
-    def x(self, new: ArrayLike):
-        self._x = new#[~np.isnan(new)]
-        self.graph.setData(new + self.shift, self.y - self.bg)
-
     @property
     def y(self):
         return self._y
 
-    @y.setter
-    def y(self, new: ArrayLike):
-        self._y = new#[~np.isnan(new)]
-        self.graph.setData(self.x + self.shift, new - self.bg)
+    @property
+    def bg(self):
+        """The background of a spectrum, composed by an internal and external background
+
+            * Internal background: from the same file, explicitly set as the background signal
+            * External background: some other SpectrumTreeItem (optional)
+
+        Notes: 
+        
+        When using the external background, avoid subtracting self._external_bg.spectrum[1] as this will zero out when applying background.
+
+        If the external background does not broadcast to the shape of the data (or is not a scalar) it will be ignored.
+
+        It is implicitly assumed that the internal background is of correct dimensions, as it is tightly associated with the data.
+        """
+        #TODO: revisit this mechanism of internal+external background
+        bg_ext = self._external_bg.y-self._external_bg._internal_bg if isinstance(self._external_bg,SpectrumTreeItem) else self._external_bg
+            
+        if (np.shape(bg_ext) == np.shape(self._y)) or (np.shape(bg_ext)==0):
+            return self._internal_bg+bg_ext
+        else:
+            return self._internal_bg
 
     @property
     def spectrum(self):
@@ -136,29 +151,53 @@ class SpectrumTreeItem(QTreeWidgetItem):
             return False
         is_parent_a_dir = self.parent().is_dir if self.parent() is not None else True
         return (not self.is_content) or is_parent_a_dir
-        
 
-    def set_spectrum(self, x, y, bg=None, **kwargs):
+    def set_spectrum(self, x, y, bg=0, **kwargs):
+        """Set the spectrum for this item by providing x,y and background.
+        
+        This method is mainly intended to set the original spectrum with data from a file, before further processing.
+
+        The provided data will be plotted if `self.graph` is associated with a PlotWidget (the graph data will be updated regardless).
+        """
         name = kwargs.pop("name", None)
         self.shift = kwargs.pop("shift", 0)
         if name:
             self.label = name
         self._x = x#[~np.isnan(x)]
         self._y = y#[~np.isnan(y)]
-        # self.bg = self.bg if bg is None else bg[~np.isnan(bg)]
-        if bg is not None:
-            self.bg = bg if len(np.shape(bg))== 0 else bg#[~np.isnan(bg)]     
+        self._internal_bg = bg
         self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
         self.is_loaded = True
 
     def set_background(self, bg):
+        """"Update the (internal, or external) background of the spectrum and update the plot.
+        
+        Will mark the currently selected background for this spectrum by using a boldface font, changing the previous the normal face.
+
+        Will traverse the hierarchy down to descendants, if present.
+        """
+        # Assume external background when another SpectrumTreeItem is provided.
+        is_external = isinstance(bg,SpectrumTreeItem)
+        # Assume external background is to be cleared when None
+        clear_external_bg = bg is None
         if self.childCount()==0:
-            if (np.shape(bg) == np.shape(self._y)) or (len(np.shape(bg))==0):
-                self.bg = bg
-                self.graph.setData(self._x + self.shift, self._y - bg)
+            bg_values = 0 if clear_external_bg else bg.y - bg._internal_bg if is_external else bg
+            if (np.shape(bg_values)==np.shape(self._y)) or (len(np.shape(bg_values))==0):
+                # only update backgrounds when shape matches, or is a constant.
+                if is_external or clear_external_bg:
+                    if isinstance(self._external_bg,SpectrumTreeItem):
+                        self._external_bg.setStatusTip(0,None)
+                    self._external_bg = bg
+                    if is_external:
+                        bg.setStatusTip(0,"Active background spectrum")
+                else:
+                    self._internal_bg = bg_values
+                self.graph.setData(self.x+self.shift, self.y-self.bg)
             else:
-                self.logger.info(f"Cannot set background, inapproriate shape: {np.shape(bg)=} vs. {np.shape(self._y)=}")
-        else:
+                self.logger.info(f"Cannot set background, inappropriate shape: {np.shape(bg_values)=} vs. {np.shape(self._y)=}")
+        else: 
+            if is_external or clear_external_bg:
+                self._external_bg = bg
             for i in range(self.childCount()):
                 self.child(i).set_background(bg)
 

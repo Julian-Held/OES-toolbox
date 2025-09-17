@@ -77,11 +77,20 @@
             </item>
             <item>
              <widget class="QTreeWidget" name="file_list">
+              <property name="mouseTracking">
+               <bool>true</bool>
+              </property>
               <property name="contextMenuPolicy">
                <enum>Qt::CustomContextMenu</enum>
               </property>
               <property name="acceptDrops">
                <bool>true</bool>
+              </property>
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>File tree view of spectra, supports drag&amp;drop</string>
               </property>
               <property name="autoFillBackground">
                <bool>true</bool>
@@ -728,10 +737,10 @@
              <number>3</number>
             </property>
             <property name="minimum">
-             <double>-10.000000000000000</double>
+             <double>-30.000000000000000</double>
             </property>
             <property name="maximum">
-             <double>10.000000000000000</double>
+             <double>30.000000000000000</double>
             </property>
             <property name="singleStep">
              <double>0.010000000000000</double>

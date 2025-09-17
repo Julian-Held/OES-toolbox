@@ -137,6 +137,7 @@ class Window(QMainWindow):
         self.file_list.dropEvent = self.do_drag_drop
         self.file_list.dragEnterEvent = self.check_drag_drop
         self.file_list.dragMoveEvent = self.check_drag_drop
+        self.file_list.currentItemChanged.connect(self.on_current_item_changed)
         self.file_list.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.clear_file_list.clicked.connect(self.actionClearFiles.trigger)
         self.actionClearFiles.triggered.connect(self.on_file_clear_action)
@@ -144,9 +145,10 @@ class Window(QMainWindow):
         self.file_list.keyPressEvent = self.file_list_keys
         self.bg_internal_check.hide()
         self.bg_internal_check.stateChanged.connect(self.update_spec)
-        self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
-        self.bg_extra_check.stateChanged.connect(self.update_spec)
-        self.bg_extra_ledit.num = 0
+        # self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
+        self.bg_extra_btn.clicked.connect(self.on_open_bg_file)
+        # self.bg_extra_check.stateChanged.connect(self.update_spec)
+        # self.bg_extra_ledit.num = 0
         self.file_list.customContextMenuRequested.connect(self.file_rightClick)
 
         # help menu
@@ -303,6 +305,40 @@ class Window(QMainWindow):
             QTreeWidget.keyPressEvent(self.file_list, event)
         event.accept()
             
+    def on_open_bg_file(self):
+        """"Open a separate background file (not from the File Tree) via a FileDialog.
+        
+        This loads data, creates a SpectrumTreeItem and associates it with the currently active spectra.
+        The SpectrumTreeItem is not added to the file tree however, and the background spectrum will not be plotted (or be plottable).
+        """
+        path,filter = QFileDialog.getOpenFileName(caption='Open background file')
+        path = Path(path).resolve()
+        if path.exists() & path.is_file():
+            from OES_toolbox.file_handling import FileLoader
+            data = FileLoader.open_any_spectrum(path)
+            item = SpectrumTreeItem(path,label='Background')
+            if len(data)>1:
+                roi_idx, accepted =  QInputDialog.getInt(self,"Pick background ROI","Pick ROI index",min=0,max=len(data)-1)
+                if not accepted:
+                    return
+            else:
+                roi_idx=0
+            if np.ndim(data[roi_idx].y)>1:
+                idx,accepted = QInputDialog.getInt(
+                    self,
+                    "Pick background spectrum", 
+                    f"Pick index of spectrum from file (out of {data[roi_idx].shape[1]})", 
+                    min=0,
+                    max=data[roi_idx].shape[1]-1
+                )
+                if not accepted:
+                    return
+            else:
+                idx = 0
+            y = data[roi_idx].y if np.ndim(data[roi_idx].y)<2 else data[roi_idx].y[:,idx]
+            item.set_spectrum(data[roi_idx].x,y,bg=data[roi_idx].background)
+            self.on_set_background_action(item)
+
 
 ##############################################################################
 # <------------------------- general plotting -----------------------------> #
@@ -380,6 +416,19 @@ class Window(QMainWindow):
 ##############################################################################
 # <-------------------- Plotting measurement data -------------------------> #
 ##############################################################################
+    
+    def on_current_item_changed(self,current:SpectrumTreeItem,previous:SpectrumTreeItem):
+        if (previous is not None) and isinstance(previous._external_bg,SpectrumTreeItem):
+            previous._external_bg.setStatusTip(0,None)
+        if current is not None:
+            if isinstance(current._external_bg, SpectrumTreeItem):
+                bg_path = current._external_bg.path.as_posix()
+                current._external_bg.setStatusTip(0,"Active background spectrum")
+            else:
+                bg_path = ""
+            self.bg_extra_ledit.setText(bg_path)
+            self.bg_extra_check.setChecked(isinstance(current._external_bg,SpectrumTreeItem))
+
 
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
         """Loads file and plots content."""
@@ -428,9 +477,8 @@ class Window(QMainWindow):
                 if not this_item._is_selected_with_ancestors():
                     this_item.remove_from_graph(self.specplot)
             for this_item in selected:
-                # if not this_item._data_has_been_loaded:
-                self.plot_filetree_item(this_item)
-                # this_item.add_to_graph(self.specplot)
+                if not this_item.is_dir:
+                    self.plot_filetree_item(this_item)
             if autorange_flag:
                 viewbox.autoRange()
                 self.logger.debug(f"Autoranging-> {autorange_state=}")
@@ -449,9 +497,7 @@ class Window(QMainWindow):
                 viewbox.disableAutoRange()
             check_state: bool = item.checkState(col) == Qt.CheckState.Checked
             if check_state | item._is_checked_with_ancestors():
-                # if not item._data_has_been_loaded:
                 self.plot_filetree_item(item)
-                # item.add_to_graph(self.specplot)
             else:
                 item.remove_from_graph(self.specplot)
                 # persist checked children
@@ -514,32 +560,31 @@ class Window(QMainWindow):
 
     def file_rightClick(self, cursor):
         file_item: SpectrumTreeItem = self.file_list.itemAt(cursor)
-
-        num = file_item.content_num
-        path = file_item.path.resolve().as_posix()
+        if file_item is None:
+            return
 
         menu = QMenu()
         reload_action = QAction("Reload this file")
         bg_action = QAction("Use as background", checkable=True)
+        reset_bg_action = QAction("Reset background")
         del_this_action = QAction("Clear this item")
         del_selected_action = QAction("Clear selected")
         del_unselected_action = QAction("Clear not selected")
         del_unchecked_action = QAction("Clear not checked")
         clear_action = QAction("Clear all")
         
-        # if file_item.is_file & (not file_item.is_content):
         if file_item.is_file_node_item:
             menu.addAction(reload_action)
-            reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))
-        
-        # TODO: revisit this for internal vs external background switching    
-        could_be_bg = True if not file_item.is_content else self.bg_extra_ledit.num==file_item.content_num
-        bg_atm = False if not (self.bg_extra_ledit.text()==path and self.bg_extra_check.isChecked()) else could_be_bg
-        self.logger.debug(f"{self.bg_extra_ledit.text()=} -> num = {num} ->\t{bg_atm=}") # file path and index of external background
+            reload_action.triggered.connect(lambda:self.on_reload_file_action(file_item))   
+        # TODO: implement toggling of external background
+        bg_atm = (file_item==file_item._external_bg) #& self.bg_extra_check.isChecked()
+    
         bg_action.setChecked(bg_atm)
 
-        if file_item.childCount() == 0:
+        if (file_item.childCount() == 0) & (not file_item.is_dir):
             menu.addAction(bg_action)
+        if file_item.is_file_node_item or file_item.is_content:
+            menu.addAction(reset_bg_action)
         menu_clear = menu.addMenu("Clear...")
         menu_clear.addAction(del_this_action)
         menu_clear.addAction(del_selected_action)
@@ -547,33 +592,26 @@ class Window(QMainWindow):
         menu_clear.addAction(del_unchecked_action)
         menu_clear.addAction(clear_action)
 
-        bg_action.triggered.connect(lambda: self.file_rightclick_bg_action(path, bg_action.isChecked(), num))
         bg_action.triggered.connect(lambda: self.on_set_background_action(file_item))
         clear_action.triggered.connect(self.on_file_clear_action)
         del_this_action.triggered.connect(file_item.remove)
         del_selected_action.triggered.connect(self.on_file_clear_action)
         del_unselected_action.triggered.connect(self.on_file_clear_action)
         del_unchecked_action.triggered.connect(self.on_file_clear_action)
+        reset_bg_action.triggered.connect(lambda: self.on_set_background_action(None))
 
         menu.exec(QtGui.QCursor.pos())
-        
-    
-    def file_rightclick_bg_action(self, bg_path, enabled, num):
-        if enabled:
-            self.bg_extra_ledit.setText(bg_path)
-            self.bg_extra_ledit.num = num
-            self.bg_extra_check.setChecked(True)
-        else:
-            self.bg_extra_check.setChecked(False)
-        self.update_spec()
 
-    def on_set_background_action(self,item):
+    def on_set_background_action(self,item:SpectrumTreeItem):
         update_on_selected = self.plot_combobox.currentIndex() == 0
         flag = QTreeWidgetItemIterator.IteratorFlag.Selected if update_on_selected else QTreeWidgetItemIterator.IteratorFlag.Checked
         iterator =  QTreeWidgetItemIterator(self.file_list,flag)
         while iterator.value():
-            iterator.value().set_background(item.y)
+            some_item:SpectrumTreeItem = iterator.value()
+            some_item.set_background(item)
             iterator += 1
+        self.bg_extra_ledit.setText("" if item is None else item.path.as_posix())
+        self.bg_extra_check.setChecked(isinstance(item,SpectrumTreeItem))
 
     def on_file_clear_action(self,*args): 
         """"Handle clearing (a subset of) files and spectra in response to an action."""
@@ -613,7 +651,11 @@ class Window(QMainWindow):
         file_item.is_loaded = False
         file_item.clear_children()
         self.plot_filetree_item(file_item)
+        if file_item.childCount()==0:
+            file_item.set_background(None)
         self.update_spec_colors()
+        self.bg_extra_ledit.setText("")
+        self.bg_extra_check.setChecked(False)
 
 
 

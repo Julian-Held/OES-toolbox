@@ -131,7 +131,8 @@ class fio():
         files = QFileDialog.getOpenFileNames(caption='Open Files')
         spec_files = files[0]
         for f in spec_files:
-            item = self.mw.filetree_item(f)
+            # item = self.mw.filetree_item(f)
+            item = SpectrumTreeItem(Path(f),label="", is_content=False)
             self.mw.file_list.addTopLevelItem(item)
         return ""
         
