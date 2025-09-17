@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import ArrayLike
 from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction,QIcon
 from PyQt6.QtCore import Qt, pyqtSignal
 import pyqtgraph as pg
 import qtawesome as qta
