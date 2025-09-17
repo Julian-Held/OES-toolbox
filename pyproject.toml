@@ -35,6 +35,7 @@ dependencies = [
     "h5netcdf>=1.6.0",
     "charset-normalizer>=3.4.0",
     "spexread @ git+https://github.com/AntoineTUE/spexread",
+    "qtawesome>=1.4.0",
 ]
 
 [project.scripts]

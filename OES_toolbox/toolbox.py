@@ -6,13 +6,14 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QTreeWidgetItemIterator , QHeaderView, \
         QMainWindow, QVBoxLayout, QToolButton, QDialog, \
-        QDialogButtonBox, QLabel, QMenu,QTreeWidget
+        QDialogButtonBox, QLabel, QMenu,QTreeWidget,QInputDialog
 from PyQt6.QtCore import Qt, QSettings, \
         QStandardPaths, QFile
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph as pg
 import webbrowser
+import qtawesome as qta
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -419,10 +420,12 @@ class Window(QMainWindow):
     
     def on_current_item_changed(self,current:SpectrumTreeItem,previous:SpectrumTreeItem):
         if (previous is not None) and isinstance(previous._external_bg,SpectrumTreeItem):
+            previous._external_bg.setIcon(0,previous._external_bg._ICON_FILE_CACHED if previous._external_bg.is_file_node_item else QtGui.QIcon())
             previous._external_bg.setStatusTip(0,None)
         if current is not None:
             if isinstance(current._external_bg, SpectrumTreeItem):
                 bg_path = current._external_bg.path.as_posix()
+                current._external_bg.setIcon(0,current._ICON_BG)
                 current._external_bg.setStatusTip(0,"Active background spectrum")
             else:
                 bg_path = ""
@@ -564,9 +567,10 @@ class Window(QMainWindow):
             return
 
         menu = QMenu()
-        reload_action = QAction("Reload this file")
-        bg_action = QAction("Use as background", checkable=True)
-        reset_bg_action = QAction("Reset background")
+        
+        reload_action = QAction(qta.icon("mdi6.reload"),"Reload this file")
+        bg_action = QAction(qta.icon("mdi.layers"),"Use as background", checkable=True)
+        reset_bg_action = QAction(qta.icon("mdi.layers-off",color=("red",200)),"Reset background")
         del_this_action = QAction("Clear this item")
         del_selected_action = QAction("Clear selected")
         del_unselected_action = QAction("Clear not selected")

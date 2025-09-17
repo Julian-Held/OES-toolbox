@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 import pyqtgraph as pg
+import qtawesome as qta
 
 from OES_toolbox.file_handling import FileLoader, SpectraDataset
 from OES_toolbox.logger import Logger
@@ -16,6 +17,12 @@ class SpectrumTreeItem(QTreeWidgetItem):
     ignored_files = [".png", ".jpg", ".ico", ".svg", ".pdf", ".ipynb", ".py", ".pyc"]
     ignored_prefix = ["_","."]
     logger = Logger(instance=None, context={"class":"SpectrumTreeItem"})
+
+    _ICON_FOLDER = qta.icon("mdi6.folder")
+    _ICON_FILE = qta.icon("mdi6.file-outline",color="gray")
+    _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold", color="black")
+    _ICON_BG = qta.icon("mdi.layers")
+    _ICON_IO_ERROR = qta.icon("mdi6.file-outline","ei.remove", options=[{"color":"gray"},{"color":"red"}])
 
     def __init__(self,path: Path, label: str, content_num: int|None=None, is_content: bool = True,**kwargs):
         
@@ -41,6 +48,10 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         self.setCheckState(0, Qt.CheckState.Unchecked)
         self._cb_shift = None
+        if self.path.is_dir():
+            self.setIcon(0,self._ICON_FOLDER)
+        if self.path.is_file() & (not self.is_content): # Not parented yet, so cannot check `self.is_file_node_item`
+            self.setIcon(0,self._ICON_FILE)
 
     def _is_checked_with_descendants(self):
         answer = self.checked if self.childCount()==0 else (True in [self.child(i)._is_checked_with_descendants() for i in range(self.childCount())])
@@ -134,7 +145,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
     def is_loaded(self, state:bool):
         self._data_has_been_loaded = state
         if state & self.is_file_node_item:
-            self.setIcon(0,qta.icon("mdi6.file-outline","mdi6.check-bold", color="black"))
+            self.setIcon(0,self._ICON_FILE_CACHED)
 
     @property
     def is_file_node_item(self):
@@ -186,9 +197,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 # only update backgrounds when shape matches, or is a constant.
                 if is_external or clear_external_bg:
                     if isinstance(self._external_bg,SpectrumTreeItem):
+                        self._external_bg.setIcon(0,self._external_bg._ICON_FILE_CACHED if self._external_bg.is_file_node_item else QIcon())
                         self._external_bg.setStatusTip(0,None)
                     self._external_bg = bg
                     if is_external:
+                        bg.setIcon(0,self._ICON_BG)
                         bg.setStatusTip(0,"Active background spectrum")
                 else:
                     self._internal_bg = bg_values
@@ -269,7 +282,9 @@ class SpectrumTreeItem(QTreeWidgetItem):
             try:
                 datasets = FileLoader.open_any_spectrum(self.path.resolve())
             except (AttributeError,UnboundLocalError) as e:
-                raise e
+                self.setIcon(0,self._ICON_IO_ERROR)
+                self.logger.exception("Could not open file: %s",self.path.name)
+                # raise e
             if len(datasets)>1:
                 for _i,dataset in enumerate(datasets):
                     child = SpectrumTreeItem(path=self.path,is_content=True, label=dataset.name)

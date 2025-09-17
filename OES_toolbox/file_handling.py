@@ -163,7 +163,7 @@ class FileLoader:
                         break
             wl = np.polyval(calib,np.arange(1,meta['ImageLength']+1))
 
-        print(f"{np.shape(data)=} {np.shape(wl)=}, {meta['ImageLength']}")
+        # print(f"{np.shape(data)=} {np.shape(wl)=}, {meta['ImageLength']}")
         return wl,data
     
     @classmethod

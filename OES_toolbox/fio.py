@@ -15,12 +15,7 @@ from .winspec import SpeFile
 from file_read_backwards import FileReadBackwards
 import csv
 
-
-def guess_delimiter(filename):
-    sniffer = csv.Sniffer()
-    with open(filename) as fp:
-        delimiter = sniffer.sniff(fp.read(50000)).delimiter
-    return delimiter
+from OES_toolbox.Widgets import SpectrumTreeItem
 
 
 class fio():
