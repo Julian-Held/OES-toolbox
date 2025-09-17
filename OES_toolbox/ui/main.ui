@@ -730,7 +730,7 @@
             <property name="minimumSize">
              <size>
               <width>80</width>
-              <height>0</height>
+              <height>20</height>
              </size>
             </property>
             <property name="decimals">
@@ -1113,7 +1113,7 @@
              </item>
              <item>
               <property name="text">
-               <string>Fit all selected</string>
+               <string>Fit all checked</string>
               </property>
              </item>
             </widget>
@@ -1430,7 +1430,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>26</height>
+     <height>33</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
