@@ -3,7 +3,11 @@ import datetime
 import numpy as np
 from PyQt6.QtWidgets import QFileDialog, QTableWidgetItem, QMessageBox
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
-from astropy.table import Table as aTable
+# from astropy.table import Table as aTable
+
+from OES_toolbox.lazy_import import lazy_import
+# aTable = lazy_import("astropy.table")
+owl = lazy_import("owlspec")
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,12 +23,11 @@ class NISTloader(QObject):
     
     finished = pyqtSignal()
     result_ready = pyqtSignal(np.ndarray, np.ndarray, str)
-    data_ready = pyqtSignal(str, aTable)
+    data_ready = pyqtSignal(str,object) # Using object instead of astropy.table.Table saves import overhead
     progress = pyqtSignal(int)
     
     def run(self):
         self.progress.emit(1)
-        import owlspec as owl
         try:
             ele_spec = owl.spectrum(self.spec, wl_range=self.wl_range)
             nist_data = ele_spec.get_linedata()
@@ -53,8 +56,6 @@ class ident_module():
         
     def update_spec_ident(self): 
         """ Loads NIST spectra and plots them. """
-        import owlspec as owl # type: ignore
-
         min_x = 0
         max_x = 1100
         max_y = 1

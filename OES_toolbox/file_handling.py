@@ -4,7 +4,6 @@ Whenever a new file-type needs to be supported, this is the place to start.
 """
 
 from pathlib import Path
-import importlib.util
 import time
 import re
 from PyQt6.QtGui import QImage
@@ -12,10 +11,10 @@ from matplotlib.figure import Figure
 import sif_parser
 from OES_toolbox import pyAvantes
 import numpy as np
-import pandas as pd
-import xarray as xr
+# import pandas as pd
+# import xarray as xr
 from charset_normalizer import is_binary, from_bytes, from_fp
-from spexread.parsing import read_spe_file
+# from spexread.parsing import read_spe_file
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,7 +22,11 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray,ArrayLike
 
 from OES_toolbox.logger import Logger
+from OES_toolbox.lazy_import import lazy_import
 
+pd = lazy_import("pandas")
+xr = lazy_import("xarray")
+spexread = lazy_import("spexread")
 
 
 class SpectraDataset:
@@ -191,7 +194,7 @@ class FileLoader:
 
     @classmethod
     def read_PI_spe(cls, f: Path)->list["DataArray"]:
-        return read_spe_file(f,as_dataset=False)
+        return spexread.parsing.read_spe_file(f,as_dataset=False)
 
     @classmethod
     def read_netCDF(cls, f:Path):

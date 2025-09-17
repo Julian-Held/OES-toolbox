@@ -4,8 +4,10 @@ import numpy as np
 from PyQt6.QtWidgets import  QFileDialog, QTreeWidgetItemIterator, \
                                 QTableWidgetItem, QMessageBox
 from PyQt6.QtCore import Qt
-
-from scipy import constants as const
+from OES_toolbox.lazy_import import lazy_import
+# from scipy import constants as const
+const = lazy_import("scipy.constants")
+scipy = lazy_import("scipy")
 
 
 def black_body(x, T, A):
@@ -90,16 +92,12 @@ class cont_module():
         self.fit_cont_spec(x,y,this_item.text(0))
         
     
-    def fit_cont_spec(self,x,y,label):
-        from scipy.optimize import curve_fit
-        
+    def fit_cont_spec(self,x,y,label):      
         if self.mw.cont_minfilter_check.isChecked():
-            from scipy.ndimage import minimum_filter1d
-            y = minimum_filter1d(y, self.mw.cont_minfilter_num.value())
+            y = scipy.ndimage.minimum_filter1d(y, self.mw.cont_minfilter_num.value())
         
         if self.mw.cont_medfilter_check.isChecked():
-            from scipy.signal import medfilt
-            y = medfilt(y, self.mw.cont_medfilter_num.value())
+            y = scipy.signal.medfilt(y, self.mw.cont_medfilter_num.value())
     
         T0 = self.mw.cont_T0.value()
         y0 = black_body(x,T0,1)
@@ -112,11 +110,11 @@ class cont_module():
         
         if self.mw.cont_fit_y0_check.isChecked():
             p0 = (T0, A0, 0)
-            ans, err = curve_fit(black_body2, x, y, p0=p0)
+            ans, err = scipy.optimize.curve_fit(black_body2, x, y, p0=p0)
             y_fit = black_body2(x, *ans)
         else:
             p0 = (T0, A0)
-            ans, err = curve_fit(black_body, x, y, p0=p0)
+            ans, err = scipy.optimize.curve_fit(black_body, x, y, p0=p0)
             y_fit = black_body(x, *ans)
             
         plot_label = 'fit T = ' + str(round(ans[0],3)) + ' for ' + label

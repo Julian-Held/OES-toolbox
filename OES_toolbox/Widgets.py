@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-from numpy.typing import ArrayLike
 from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
 from PyQt6.QtGui import QAction,QIcon
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -10,6 +9,9 @@ import qtawesome as qta
 from OES_toolbox.file_handling import FileLoader, SpectraDataset
 from OES_toolbox.logger import Logger
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
 
 class SpectrumTreeItem(QTreeWidgetItem):
     """A QTreeWidgetItem representing a single spectrum"""
