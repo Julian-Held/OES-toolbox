@@ -729,8 +729,14 @@
             </property>
             <property name="minimumSize">
              <size>
-              <width>80</width>
+              <width>50</width>
               <height>20</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>60</width>
+              <height>16777215</height>
              </size>
             </property>
             <property name="decimals">
