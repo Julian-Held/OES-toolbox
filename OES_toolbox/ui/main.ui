@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1267</width>
-    <height>684</height>
+    <height>806</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -767,26 +767,13 @@
             </property>
            </spacer>
           </item>
-<item>
+          <item>
            <widget class="QCheckBox" name="check_HideLegend">
             <property name="text">
-             <string>Hide legend</string>
+             <string>Show legend</string>
             </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QProgressBar" name="progress_bar">
-            <property name="enabled">
+            <property name="checked">
              <bool>true</bool>
-            </property>
-            <property name="maximum">
-             <number>0</number>
-            </property>
-            <property name="value">
-             <number>0</number>
-            </property>
-            <property name="textVisible">
-             <bool>false</bool>
             </property>
            </widget>
           </item>
@@ -1338,7 +1325,7 @@
              </item>
              <item>
               <property name="text">
-               <string>Fit all selected</string>
+               <string>Fit all checked</string>
               </property>
              </item>
             </widget>
@@ -1430,7 +1417,7 @@
      <x>0</x>
      <y>0</y>
      <width>1267</width>
-     <height>33</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -1609,7 +1596,7 @@
  <customwidgets>
   <customwidget>
    <class>PlotWidget</class>
-   <extends>QWidget</extends>
+   <extends>QGraphicsView</extends>
    <header>pyqtgraph</header>
    <container>1</container>
   </customwidget>

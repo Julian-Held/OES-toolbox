@@ -6,7 +6,8 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QTreeWidgetItemIterator , QHeaderView, \
         QMainWindow, QVBoxLayout, QToolButton, QDialog, \
-        QDialogButtonBox, QLabel, QMenu,QTreeWidget,QInputDialog
+        QDialogButtonBox, QLabel, QMenu,QTreeWidget,QInputDialog, \
+        QProgressBar
 from PyQt6.QtCore import Qt, QSettings, \
         QStandardPaths, QFile
 from PyQt6.QtGui import QAction, QImage, QPixmap
@@ -91,10 +92,14 @@ class Window(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         uic.loadUi(file_dir + "/ui/main.ui", self)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0,0)
+        self.progress_bar.setMaximumWidth(180)
+        self.statusBar().addPermanentWidget(self.progress_bar)
+        self.progress_bar.hide()
         self.status_msg = QLabel()
         self.statusBar().addPermanentWidget(self.status_msg)
         self.logger = Logger(self)
-        self.progress_bar.hide()
         
         self.settings = settings(self)
         self.io = fio(self)
@@ -235,7 +240,7 @@ class Window(QMainWindow):
         rhandle.setLayout(layout)
 
         self.check_HideLegend.checkStateChanged.connect(
-            lambda state: self.specplot.plotItem.legend.setVisible(state != Qt.CheckState.Checked)
+            lambda state: self.specplot.plotItem.legend.setVisible(state == Qt.CheckState.Checked)
         )
 
 
@@ -403,10 +408,12 @@ class Window(QMainWindow):
         self.working = self.working + p
         if self.working == 0:
             self.progress_bar.hide()
+            self.status_msg.show()
             self.ident_go.setEnabled(True)
             self.ident_clear.setEnabled(True)
         else:
             self.progress_bar.show()
+            self.status_msg.hide()
             self.ident_go.setEnabled(False)
             self.ident_clear.setEnabled(False)
             
@@ -593,7 +600,7 @@ class Window(QMainWindow):
             menu.addAction(bg_action)
         if file_item.is_file_node_item or file_item.is_content:
             menu.addAction(reset_bg_action)
-        menu_clear = menu.addMenu("Clear...")
+        menu_clear = menu.addMenu("Clear")
         menu_clear.addAction(del_this_action)
         menu_clear.addAction(del_selected_action)
         menu_clear.addAction(del_unselected_action)
