@@ -25,6 +25,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
     _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold", color="black")
     _ICON_BG = qta.icon("mdi.layers")
     _ICON_IO_ERROR = qta.icon("mdi6.file-outline","ei.remove", options=[{"color":"gray"},{"color":"red"}])
+    _ICON_BG_ACTIVE = qta.icon("mdi6.file-minus-outline")
 
     def __init__(self,path: Path, label: str, content_num: int|None=None, is_content: bool = True,**kwargs):
         
@@ -200,6 +201,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
         clear_external_bg = bg is None
         if self.childCount()==0:
             bg_values = 0 if clear_external_bg else bg.y - bg._internal_bg if is_external else bg
+            if clear_external_bg:
+                self.setIcon(0,self._ICON_FILE_CACHED if self.is_file_node_item else QIcon())
             if (np.shape(bg_values)==np.shape(self._y)) or (len(np.shape(bg_values))==0):
                 # only update backgrounds when shape matches, or is a constant.
                 if is_external or clear_external_bg:
@@ -209,6 +212,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                     self._external_bg = bg
                     if is_external:
                         bg.setIcon(0,self._ICON_BG)
+                        self.setIcon(0,self._ICON_BG_ACTIVE)
                         bg.setStatusTip(0,"Active background spectrum")
                 else:
                     self._internal_bg = bg_values
@@ -220,6 +224,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 self._external_bg = bg
             for i in range(self.childCount()):
                 self.child(i).set_background(bg)
+
 
     def add_to_graph(self, plot):
         if self.childCount() == 0:
