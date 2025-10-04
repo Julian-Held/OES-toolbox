@@ -156,6 +156,7 @@ class Window(QMainWindow):
         # self.bg_extra_check.stateChanged.connect(self.update_spec)
         # self.bg_extra_ledit.num = 0
         self.file_list.customContextMenuRequested.connect(self.file_rightClick)
+        self.file_list.viewport().installEventFilter(self)
 
         # help menu
         self.actionDocumentation.triggered.connect(lambda: webbrowser.open('https://github.com/mimurrayy/OES-toolbox/wiki'))
@@ -247,6 +248,14 @@ class Window(QMainWindow):
 ##############################################################################
 # <-------------------- basic/general UI function -------------------------> #
 ##############################################################################
+
+    def eventFilter(self, source, event): #prevents spec select on right click
+        if hasattr(event, 'button'):
+            if (event.button() == Qt.RightButton and
+                source is self.file_list.viewport()):
+                return True
+        return super(Window, self).eventFilter(source, event)
+
 
     def toggle_left_pane(self):
         w = self.splitter.size().width()
@@ -663,9 +672,20 @@ class Window(QMainWindow):
                 self.file_list.itemFromIndex(current_index).remove()
 
     def on_reload_file_action(self, file_item:SpectrumTreeItem):
+        was_plotted = file_item.is_plotted(self.specplot)
         file_item.is_loaded = False
         file_item.clear_children()
-        self.plot_filetree_item(file_item)
+        if was_plotted:
+            self.plot_filetree_item(file_item)
+        else:
+            if (not file_item.is_loaded) & (file_item.is_file):
+                try:
+                    file_item.load_data()
+                except (AttributeError,UnboundLocalError):
+                    self.status_msg.setText(f"Could not load data from {file_item.path.name}")
+                    return
+                self.status_msg.setText(f"Loading file {file_item.path.name} complete!")
+
         if file_item.childCount()==0:
             file_item.set_background(None)
         self.update_spec_colors()

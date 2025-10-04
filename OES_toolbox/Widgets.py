@@ -92,6 +92,9 @@ class SpectrumTreeItem(QTreeWidgetItem):
         full_name =  f"{parent_name}{name_stem}".strip().strip("/").strip(":")
         return full_name
     
+    def is_plotted(self, plot):
+        return self.graph in plot.allChildItems()
+    
     @property
     def checked(self):
         return self.checkState(0) == Qt.CheckState.Checked
@@ -191,6 +194,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
         """
         # Assume external background when another SpectrumTreeItem is provided.
         is_external = isinstance(bg,SpectrumTreeItem)
+        if is_external and not bg.is_loaded:
+            bg.load_data()
         # Assume external background is to be cleared when None
         clear_external_bg = bg is None
         if self.childCount()==0:
@@ -296,7 +301,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 self._populate_with_data(datasets[0], label="spectrum")
             self.is_loaded = True
 
-    def _populate_with_data(self,dataset:SpectraDataset, label=None):
+    def _populate_with_data(self, dataset:SpectraDataset, label=None):
         """Add data from a SpectraDataset to this object.
 
         If the SpectraDataset contains multiple spectra, add necessary child items to represent the data.
