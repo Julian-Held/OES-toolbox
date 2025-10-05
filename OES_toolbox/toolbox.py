@@ -639,8 +639,10 @@ class Window(QMainWindow):
 
         if (file_item.childCount() == 0) & (not file_item.is_dir):
             menu.addAction(bg_action)
-        if file_item.is_file_node_item or file_item.is_content:
+        if (file_item.is_file_node_item or file_item.is_content or 
+                                isinstance(file_item._external_bg ,SpectrumTreeItem)):
             menu.addAction(reset_bg_action)
+        
         menu_clear = menu.addMenu("Clear")
         menu_clear.addAction(del_this_action)
         menu_clear.addAction(del_selected_action)
