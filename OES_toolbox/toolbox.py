@@ -131,7 +131,6 @@ class Window(QMainWindow):
         self.actionClear_Plots.triggered.connect(self.clear_all_spec)
     
         # file loading, plotting /drag & drop
-        self.file_opt_group.hide() # TODO not a thing yet, hide for now
         self.button_open.clicked.connect(self.actionOpenFolder.trigger)
         self.button_open_files.clicked.connect(self.actionOpenFiles.trigger)
         self.actionOpenFolder.triggered.connect(self.io.open_folder)
@@ -152,8 +151,11 @@ class Window(QMainWindow):
         self.bg_internal_check.hide()
         self.bg_internal_check.stateChanged.connect(self.update_spec)
         # self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
-        self.bg_extra_btn.clicked.connect(self.on_open_bg_file)
-        # self.bg_extra_check.stateChanged.connect(self.update_spec)
+        # self.bg_extra_btn.clicked.connect(self.on_open_bg_file)
+        self.bg_extra_check.stateChanged.connect(self.on_bg_check_change)
+        self.reload_file_btn.clicked.connect(lambda: self.on_reload_file_action(self.file_list.selectedItems()[0]))
+        self.clear_file_btn.clicked.connect(self.on_file_clear_action)
+        
         # self.bg_extra_ledit.num = 0
         self.file_list.customContextMenuRequested.connect(self.file_rightClick)
         self.file_list.viewport().installEventFilter(self)
@@ -449,8 +451,7 @@ class Window(QMainWindow):
                 current._external_bg.setStatusTip(0,"Active background spectrum")
             else:
                 bg_path = ""
-            self.bg_extra_ledit.setText(bg_path)
-            self.bg_extra_check.setChecked(isinstance(current._external_bg,SpectrumTreeItem))
+
 
 
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
@@ -483,16 +484,41 @@ class Window(QMainWindow):
                 iterator += 1
                 self.on_check_change(item, 0)
 
+
+    def update_file_info_box(self, selected):
+        if len(selected) == 1:
+            this_item = selected[0]
+            self.spec_info_gbox.setEnabled(True)
+            self.sel_spec_label.setText(this_item.name(shorten=True))
+            self.reload_file_btn.setEnabled(this_item.is_file_node_item)
+            self.clear_file_btn.setEnabled(this_item.is_file_node_item)
+            bg_item = this_item._external_bg
+
+            if isinstance(bg_item,SpectrumTreeItem):
+                bg_label = bg_item.name()
+                self.bg_extra_ledit.setText(bg_label)
+            else:
+                self.bg_extra_ledit.setText("")
+
+            self.bg_extra_check.setChecked(isinstance(bg_item,SpectrumTreeItem))
+            self.bg_extra_check.setEnabled(isinstance(bg_item,SpectrumTreeItem))
+        
+        else:
+            self.spec_info_gbox.setEnabled(False)
+            self.sel_spec_label.setText(" ")
+
+
     def on_selection_change(self):
         update_on_selected = self.plot_combobox.currentIndex() == 0
         self.logger.debug(f"Selection Changed -> {update_on_selected=}")
+        selected = self.file_list.selectedItems()
+
         if update_on_selected:
             viewbox = self.specplot.getViewBox()
             autorange_state:list[bool] = viewbox.getState()['autoRange']
             autorange_flag: bool = True in autorange_state
             if autorange_flag:
                 viewbox.disableAutoRange()
-            selected = self.file_list.selectedItems()
             iterator = QTreeWidgetItemIterator(self.file_list, flags=QTreeWidgetItemIterator.IteratorFlag.Unselected)
             while iterator.value():
                 this_item:SpectrumTreeItem = iterator.value()
@@ -506,9 +532,14 @@ class Window(QMainWindow):
                 viewbox.autoRange()
                 self.logger.debug(f"Autoranging-> {autorange_state=}")
             viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
-        
+        self.update_file_info_box(selected)
         self.update_spec_colors()
-        
+
+
+    def on_bg_check_change(self, checked):
+        if not checked:
+              self.on_set_background_action(None)
+
 
     def on_check_change(self, item, col):
         update_on_check = self.plot_combobox.currentIndex() == 1
@@ -534,6 +565,7 @@ class Window(QMainWindow):
             viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
             self.update_spec_colors()
     
+
     def clear_all_spec(self):
         self.mol.clear_spec()
         self.ident.clear_spec_ident()
@@ -634,15 +666,17 @@ class Window(QMainWindow):
             some_item:SpectrumTreeItem = iterator.value()
             some_item.set_background(item)
             iterator += 1
-        self.bg_extra_ledit.setText("" if item is None else item.path.as_posix())
+        self.bg_extra_ledit.setText("" if item is None else item.name())
         self.bg_extra_check.setChecked(isinstance(item,SpectrumTreeItem))
+        self.bg_extra_check.setEnabled(isinstance(item,SpectrumTreeItem))
+
 
     def on_file_clear_action(self,*args): 
         """"Handle clearing (a subset of) files and spectra in response to an action."""
         triggered_by = self.sender().text()
         self.logger.info(f"Action fired: {triggered_by}")
         match triggered_by:
-            case "Clear selected":
+            case "Clear selected"|"Clear file":
                 targets: list[SpectrumTreeItem]  = self.file_list.selectedItems()
             case "Clear not selected":
                 targets: list[SpectrumTreeItem] = []
@@ -673,6 +707,7 @@ class Window(QMainWindow):
 
     def on_reload_file_action(self, file_item:SpectrumTreeItem):
         was_plotted = file_item.is_plotted(self.specplot)
+        was_selected = (file_item in self.file_list.selectedItems())
         file_item.is_loaded = False
         file_item.clear_children()
         if was_plotted:
@@ -685,13 +720,14 @@ class Window(QMainWindow):
                     self.status_msg.setText(f"Could not load data from {file_item.path.name}")
                     return
                 self.status_msg.setText(f"Loading file {file_item.path.name} complete!")
-
+        if was_selected and not was_plotted:
+            self.on_selection_change()
         if file_item.childCount()==0:
             file_item.set_background(None)
         self.update_spec_colors()
         self.bg_extra_ledit.setText("")
         self.bg_extra_check.setChecked(False)
-
+        self.bg_extra_check.setEnabled(False)
 
 
     def cont_fit_results_rightClick(self, cursor):

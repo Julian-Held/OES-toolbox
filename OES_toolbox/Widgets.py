@@ -88,7 +88,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
             name_stem = f"{self.label}"
 
         if shorten:
-            return name_stem.strip()
+            return name_stem.strip().strip("/").lstrip(":").strip()
         parent_name = f"{self.parent().name()}" if self.parent() is not None else ""
         full_name =  f"{parent_name}{name_stem}".strip().strip("/").strip(":")
         return full_name

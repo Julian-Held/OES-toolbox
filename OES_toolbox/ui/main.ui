@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1267</width>
-    <height>806</height>
+    <width>1280</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -49,120 +49,177 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_2"/>
+          <layout class="QHBoxLayout" name="horizontalLayout_35">
+           <item>
+            <widget class="QPushButton" name="button_open_files">
+             <property name="text">
+              <string>Open files</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="button_open">
+             <property name="text">
+              <string>Open folder</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item>
-          <widget class="QGroupBox" name="groupBox_2">
-           <property name="title">
-            <string>Files</string>
+          <widget class="QTreeWidget" name="file_list">
+           <property name="mouseTracking">
+            <bool>true</bool>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_5">
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_35">
-              <item>
-               <widget class="QPushButton" name="button_open_files">
-                <property name="text">
-                 <string>Open files</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="button_open">
-                <property name="text">
-                 <string>Open folder</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <widget class="QTreeWidget" name="file_list">
-              <property name="mouseTracking">
-               <bool>true</bool>
-              </property>
-              <property name="contextMenuPolicy">
-               <enum>Qt::CustomContextMenu</enum>
-              </property>
-              <property name="acceptDrops">
-               <bool>true</bool>
-              </property>
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>File tree view of spectra, supports drag&amp;drop</string>
-              </property>
-              <property name="autoFillBackground">
-               <bool>true</bool>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">QFrame {background-image: url(:/images/background.png); 
+           <property name="contextMenuPolicy">
+            <enum>Qt::CustomContextMenu</enum>
+           </property>
+           <property name="acceptDrops">
+            <bool>true</bool>
+           </property>
+           <property name="toolTip">
+            <string/>
+           </property>
+           <property name="statusTip">
+            <string>File tree view of spectra, supports drag&amp;drop</string>
+           </property>
+           <property name="autoFillBackground">
+            <bool>true</bool>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QFrame {background-image: url(:/images/background.png); 
               background-position: center center;
               background-repeat: no-repeat;
 };</string>
+           </property>
+           <property name="dragDropMode">
+            <enum>QAbstractItemView::DropOnly</enum>
+           </property>
+           <property name="selectionMode">
+            <enum>QAbstractItemView::ExtendedSelection</enum>
+           </property>
+           <property name="columnCount">
+            <number>1</number>
+           </property>
+           <attribute name="headerVisible">
+            <bool>false</bool>
+           </attribute>
+           <attribute name="headerDefaultSectionSize">
+            <number>97</number>
+           </attribute>
+           <attribute name="headerStretchLastSection">
+            <bool>false</bool>
+           </attribute>
+           <column>
+            <property name="text">
+             <string notr="true">1</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_9">
+           <item>
+            <widget class="QComboBox" name="plot_combobox">
+             <property name="currentText">
+              <string>plot selected</string>
+             </property>
+             <item>
+              <property name="text">
+               <string>plot selected</string>
               </property>
-              <property name="dragDropMode">
-               <enum>QAbstractItemView::DropOnly</enum>
+             </item>
+             <item>
+              <property name="text">
+               <string>plot checked</string>
               </property>
-              <property name="selectionMode">
-               <enum>QAbstractItemView::ExtendedSelection</enum>
+             </item>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="clear_file_list">
+             <property name="text">
+              <string>Clear</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="spec_info_gbox">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="title">
+            <string>Selected</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_9">
+            <item>
+             <widget class="QLabel" name="sel_spec_label">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
               </property>
-              <property name="columnCount">
-               <number>1</number>
+              <property name="text">
+               <string> </string>
               </property>
-              <attribute name="headerVisible">
-               <bool>false</bool>
-              </attribute>
-              <attribute name="headerDefaultSectionSize">
-               <number>97</number>
-              </attribute>
-              <attribute name="headerStretchLastSection">
-               <bool>false</bool>
-              </attribute>
-              <column>
-               <property name="text">
-                <string notr="true">1</string>
-               </property>
-              </column>
              </widget>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_9">
+             <layout class="QHBoxLayout" name="horizontalLayout_2">
               <item>
-               <widget class="QComboBox" name="plot_combobox">
-                <property name="currentText">
-                 <string>plot selected</string>
+               <widget class="QPushButton" name="reload_file_btn">
+                <property name="text">
+                 <string>Reload file</string>
                 </property>
-                <item>
-                 <property name="text">
-                  <string>plot selected</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>plot checked</string>
-                 </property>
-                </item>
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="clear_file_list">
+               <widget class="QPushButton" name="clear_file_btn">
                 <property name="text">
-                 <string>Clear</string>
+                 <string>Clear file</string>
                 </property>
                </widget>
               </item>
              </layout>
             </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="groupBox_4">
-           <property name="title">
-            <string>Background subtraction</string>
-           </property>
-           <layout class="QVBoxLayout" name="verticalLayout_9">
+            <item>
+             <widget class="Line" name="line">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="bg_extra_check">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="text">
+               <string>Subtract background</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_21">
+              <item>
+               <widget class="QLabel" name="label">
+                <property name="text">
+                 <string>BG spec</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="bg_extra_ledit">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
             <item>
              <widget class="QCheckBox" name="bg_internal_check">
               <property name="text">
@@ -172,174 +229,6 @@
                <bool>true</bool>
               </property>
              </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="bg_extra_check">
-              <property name="text">
-               <string>Background from separate file</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_21">
-              <item>
-               <widget class="QLineEdit" name="bg_extra_ledit">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="bg_extra_btn">
-                <property name="text">
-                 <string>Open</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="file_opt_group">
-           <property name="title">
-            <string>File options</string>
-           </property>
-           <layout class="QVBoxLayout" name="verticalLayout_2">
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_3">
-              <item>
-               <widget class="QLabel" name="label">
-                <property name="text">
-                 <string>Preset</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QComboBox" name="comboBox">
-                <item>
-                 <property name="text">
-                  <string>autodetect</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>custom</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>Avantes</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>OceanOptics</string>
-                 </property>
-                </item>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_4">
-              <item>
-               <widget class="QLabel" name="label_2">
-                <property name="text">
-                 <string>Delimiter     </string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QLineEdit" name="lineEdit"/>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_5">
-              <item>
-               <widget class="QLabel" name="label_3">
-                <property name="text">
-                 <string>Header lines</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="spinBox_5"/>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_13">
-              <item>
-               <widget class="QLabel" name="label_8">
-                <property name="text">
-                 <string>Footer lines</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="spinBox_4"/>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_10">
-              <item>
-               <widget class="QLabel" name="label_6">
-                <property name="text">
-                 <string>Wavelength column</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="spinBox">
-                <property name="value">
-                 <number>1</number>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_11">
-              <item>
-               <widget class="QLabel" name="label_5">
-                <property name="text">
-                 <string>Data Column</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="spinBox_2">
-                <property name="value">
-                 <number>2</number>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_12">
-              <item>
-               <widget class="QLabel" name="label_7">
-                <property name="text">
-                 <string>Background column</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="spinBox_3">
-                <property name="minimum">
-                 <number>-1</number>
-                </property>
-                <property name="value">
-                 <number>-1</number>
-                </property>
-               </widget>
-              </item>
-             </layout>
             </item>
            </layout>
           </widget>
@@ -1422,7 +1311,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1267</width>
+     <width>1280</width>
      <height>21</height>
     </rect>
    </property>
