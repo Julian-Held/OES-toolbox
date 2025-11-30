@@ -1,6 +1,8 @@
 import os
 import sys
 from pathlib import Path
+import platform
+import subprocess
 import numpy as np
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
@@ -122,6 +124,7 @@ class Window(QMainWindow):
         # center plot
         self.specplot.setLabel("left", "intensity")
         self.specplot.setLabel("bottom", "wavelength / nm")
+        self.specplot.setAxisItems({"top": pg.AxisItem("top",linkView=self.specplot.getViewBox()),"right":pg.AxisItem("right",linkView=self.specplot.getViewBox(),)})
         self.specplot.addLegend()
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
@@ -769,7 +772,14 @@ class Window(QMainWindow):
 ##############################################################################
 
     def open_cal_folder(self):
-        os.startfile(self.cal_path)
+        """Open folder with calibration files with OS-native file explorer"""
+        match platform.system():
+            case "Windows":
+                os.startfile(self.cal_path)
+            case "Darwin":
+                subprocess.call(["open",Path(self.cal_path).resolve().as_posix()])
+            case _:
+                subprocess.call(["xdg-open",Path(self.cal_path).resolve().as_posix()])
 
 
     def add_cal_file(self):
