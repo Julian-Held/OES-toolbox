@@ -460,7 +460,7 @@ class Window(QMainWindow):
         if (not this_item.is_loaded) & (this_item.is_file):
             try:
                 this_item.load_data()
-            except (AttributeError,UnboundLocalError):
+            except (AttributeError,UnboundLocalError, EncodingWarning):
                 self.status_msg.setText(f"Could not load data from {this_item.path.name}")
                 return
             self.status_msg.setText(f"Loading file {this_item.path.name} complete!")

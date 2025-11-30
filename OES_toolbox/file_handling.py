@@ -108,7 +108,11 @@ class FileLoader:
         """
         f = Path(f)
         with f.open("rb") as fo:
-            enc = from_fp(fo).best().encoding
+            try:
+                enc = from_fp(fo).best().encoding
+            except AttributeError as err:
+                cls.logger.warning("Could not detect encoding for '%s', perhaps this is a binary file (tried generic text file).",f.name)
+                raise EncodingWarning(f"Could not detect encoding for '{f.name}', perhaps this is a binary file (tried generic text file).") from err
         with f.open("r", encoding=enc) as fo:
             pos = []
             line_num = 0
