@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QTreeWidgetItemIterator , QHeaderView, \
         QMainWindow, QVBoxLayout, QToolButton, QDialog, \
         QDialogButtonBox, QLabel, QMenu,QTreeWidget,QInputDialog, \
-        QProgressBar
+        QProgressBar,QMessageBox
 from PyQt6.QtCore import Qt, QSettings, \
         QStandardPaths, QFile
 from PyQt6.QtGui import QAction, QImage, QPixmap
@@ -28,8 +28,11 @@ from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
 from OES_toolbox.Widgets import SpectrumTreeItem
 from OES_toolbox.logger import Logger
+from OES_toolbox.lazy_import import lazy_import
+from OES_toolbox.file_handling import FileLoader
 
 from importlib.metadata import metadata
+scipy = lazy_import("scipy")
 
 colors = ['k', '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
           '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'] # matplotlib default
@@ -38,29 +41,13 @@ pg.setConfigOption('foreground', 'k')
 pg.setConfigOptions(antialias=True)
 
 
-
-class cal_invalid_dialog(QDialog):
-    def __init__(self):
-        super().__init__()
-
-        self.setWindowTitle("Invalid calibration file format")
-
-        msg = """Invalid or unreadable calibration file. 
-Please make sure that the file is a text file which contains only two columns, 
-with the wavelength in nm and the sensitifity of the spectrometer in arbitrary 
-units, representing the photon count per second. The file must use a point as 
-the decimal delimiter and tab as the delimiter between the two columns."""
-
-        QBtn = QDialogButtonBox.StandardButton.Ok
-
-        self.buttonBox = QDialogButtonBox(QBtn)
-        self.buttonBox.accepted.connect(self.accept)
-
-        self.layout = QVBoxLayout()
-        message = QLabel(msg)
-        self.layout.addWidget(message)
-        self.layout.addWidget(self.buttonBox)
-        self.setLayout(self.layout)
+INVALID_CALIB_TXT = (
+    "Invalid calibration file format",
+    ("Invalid or unreadable calibration file.\n"
+    "Please make sure that the file is a text file which contains only two columns.\n"
+    "The wavelength must be in nm and the sensitivity of the spectrometer in arbitrary units, representing the photon count per second.\n"
+    "The file must use a point as the decimal character and either a tab or comma as the delimiter between the two columns."
+))
 
 
 class about_dialog(QDialog):
@@ -117,8 +104,8 @@ class Window(QMainWindow):
             os.makedirs(self.roaming_path)
         if not os.path.exists(self.cal_path):
             os.makedirs(self.cal_path)
-        self.cal = [[],[]]
-        self.cal_files_refresh() # TODO move out of thread to improve startup perfromance
+        self.cal = None
+        QTimer.singleShot(200, self.cal_files_refresh) # TODO move out of thread to improve startup perfromance
         self.max_child_plot = 8
         
         # center plot
@@ -784,21 +771,41 @@ class Window(QMainWindow):
 
     def add_cal_file(self):
         cal_file, _ = QFileDialog.getOpenFileName(caption='Open calibration file')
-        filename = os.path.basename(cal_file)
-        QFile.copy(cal_file, os.path.join(self.cal_path, filename))
+        if cal_file is not None:
+            target = Path(self.cal_path).joinpath(Path(cal_file).name).resolve()
+            already_exists = target.exists()
+            if already_exists:
+                picked = QMessageBox.question(
+                    self,
+                    "Calibration file already exists",
+                    f"A calibration named '{target.name}' already exists, overwrite?",
+                    buttons = QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No
+                    )
+                if picked == QMessageBox.StandardButton.No:
+                    return
+            # make sure the file is valid, by loading it to test it
+            tmp=FileLoader._read_generic_text(cal_file)
+            if np.shape(tmp)[1]!=2:
+                QMessageBox.warning(self,*INVALID_CALIB_TXT,QMessageBox.StandardButton.Ok)
+                return
+            QFile.copy(cal_file, target.as_posix())
+            self.cal_files_cbox.addItem(target.name)
+            self.cal_files_cbox.setCurrentText(target.name)
 
 
-    def cal_files_refresh(self):
-        # block signal so that test_cal_file doesn't fire on an empty string
-        self.cal_files_cbox.blockSignals(True) 
+    def cal_files_refresh(self):      
+        """Refresh the list of calibrations, adding newly added files and removing item for files that are no longer there.
         
-        files = sorted(os.listdir(self.cal_path))
-        self.cal_files_cbox.clear()
-        for f in files:
-            self.cal_files_cbox.addItem(f)
-        
-        self.load_cal_file(self.cal_files_cbox.currentText())
-        self.cal_files_cbox.blockSignals(False) # re-enable signals
+        The currently selected item is kept active (if it remains valid), which avoid firing a currentTextChanged signal.
+        """  
+        files = sorted([f.name for f in Path(self.cal_path).resolve().iterdir() if f.is_file()])
+        # currentChoice = self.cal_files_cbox.currentText()
+        currentItems = [self.cal_files_cbox.itemText(i) for i in range(self.cal_files_cbox.count())]
+        to_remove = [i for i,elem in enumerate(currentItems) if elem not in files][::-1]
+        to_add = [elem for elem in files if elem not in currentItems]
+        for elem in to_remove:
+            self.cal_files_cbox.removeItem(elem)
+        self.cal_files_cbox.addItems(to_add)
 
 
     def load_cal_file(self, filename):
@@ -806,14 +813,15 @@ class Window(QMainWindow):
         load it and save it to self.cal, if we test-load it anyway..."""
         if len(filename) > 0:
             try:
-                from scipy.interpolate import interp1d
-                x,y = np.loadtxt(os.path.join(self.cal_path, filename)).T
-                self.cal = interp1d(x, y, bounds_error=False, fill_value=0)
+                calib = FileLoader._read_generic_text(Path(self.cal_path).joinpath(filename))
+                if calib.shape[1]!=2:
+                    raise ValueError(f"Calibration file {filename} should only have two columns, got: {calib.shape[1]}")
+                # `interp1d` is deprecated; use modern API instead, which creates a callable BSpline instance, with k=1 for linear interpolation
+                self.cal = scipy.interpolate.make_interp_spline(calib.iloc[:,0], calib.iloc[:,1],k=1) 
                 self.apply_cal_check.setEnabled(True)
             except:
                 self.apply_cal_check.setEnabled(False)
-                dialog = cal_invalid_dialog()
-                dialog.exec()
+                QMessageBox.warning(self,*INVALID_CALIB_TXT,QMessageBox.StandardButton.Ok)
         else:
             self.apply_cal_check.setEnabled(False)
 

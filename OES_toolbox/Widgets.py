@@ -10,6 +10,7 @@ from OES_toolbox.file_handling import FileLoader, SpectraDataset
 from OES_toolbox.logger import Logger
 
 from typing import TYPE_CHECKING
+from collections.abc import Callable
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike
 
@@ -107,6 +108,19 @@ class SpectrumTreeItem(QTreeWidgetItem):
     @property
     def is_dir(self):
         return self.path.is_dir()
+    
+    @property
+    def calib(self)->Callable|None:
+        """Property that looks up the current calibration on the main window, which may be None
+        
+        If a calibration is loaded it will be a scipy BSpline, which is a Callable, with signature `y=f(x)`.
+        
+        If the checkbox in the main window is checked, the calibration will be used, else, returns None.
+        """
+        mw = self.treeWidget().window()
+        calib = getattr(mw,"cal",None)
+        if mw.apply_cal_check.checkState()==Qt.CheckState.Checked:
+            return calib
 
     @property
     def x(self):
@@ -293,7 +307,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         if self.is_file:
             try:
                 datasets = FileLoader.open_any_spectrum(self.path.resolve())
-            except (AttributeError,UnboundLocalError) as e:
+            except (AttributeError,UnboundLocalError,EncodingWarning) as e:
                 self.setIcon(0,self._ICON_IO_ERROR)
                 self.logger.exception("Could not open file: %s",self.path.name)
                 # raise e
@@ -330,4 +344,4 @@ class SpectrumTreeItem(QTreeWidgetItem):
             self.is_loaded = True
         else:
             self.is_content = True # needed to force non-nested files to plot their data, without adding a child node.
-            self.set_spectrum(x,y,shift=shift,bg=dataset.background,name=None)
+            self.set_spectrum(x,y,shift=shift,bg=dataset.background,name=None,bg_is_internal=dataset.has_background)
