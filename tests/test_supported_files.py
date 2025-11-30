@@ -35,7 +35,7 @@ class TestSupportedFiles:
 
         def test_read_horiba_txt(self,horiba_file):
             """Test the file provided as a sample for issue #4."""
-            wl,data = FileLoader.read_horiba_txt("./tests/test_files/Horiba.txt")
+            wl,data,_ = FileLoader.read_horiba_txt("./tests/test_files/Horiba.txt")
             assert wl.shape == (2048,)
             assert data.shape == (2048,300)
             assert data.shape[0] == wl.shape[0]
