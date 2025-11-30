@@ -367,10 +367,10 @@ class Window(QMainWindow):
 
     def update_plot_pos(self, pos):
         pos = self.specplot.getPlotItem().vb.mapSceneToView(pos[0])
-        x = "{number:07.3f}".format(number=pos.x())
-        x = '{:7.7}'.format(x)
-        y = "{number:#6.3g}".format(number=pos.y())
-        y = '{:9.9}'.format(y)
+        x = f"{pos.x():07.3f}"
+        x = f'{x:7.7}'
+        y = f"{pos.y():#6.3g}"
+        y = f'{y:9.9}'
         y = y.rstrip('. ')
 
         self.pos_display.setText("   (" + x + ', ' + str(y) + ")")
