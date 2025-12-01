@@ -111,7 +111,11 @@ class Window(QMainWindow):
         # center plot
         self.specplot.setLabel("left", "intensity")
         self.specplot.setLabel("bottom", "wavelength / nm")
-        self.specplot.setAxisItems({"top": pg.AxisItem("top",linkView=self.specplot.getViewBox()),"right":pg.AxisItem("right",linkView=self.specplot.getViewBox(),)})
+        right_ax = pg.AxisItem("right",linkView=self.specplot.getViewBox(), showValues=False)
+        top_ax = pg.AxisItem("top",linkView=self.specplot.getViewBox(), showValues=False)
+        right_ax.setWidth(7)
+        top_ax.setHeight(7)
+        self.specplot.setAxisItems({"top": top_ax, "right":right_ax})
         self.specplot.addLegend()
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
