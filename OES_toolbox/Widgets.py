@@ -341,9 +341,13 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 self.logger.exception("Could not open file: %s",self.path.name)
                 # raise e
             if len(datasets)>1:
+                # Figure out which children already exists and update their data, rather then remove-then-add
+                children = {self.child(i).label:self.child(i) for i in range(self.childCount())}
                 for _i,dataset in enumerate(datasets):
-                    child = SpectrumTreeItem(path=self.path,is_content=True, label=dataset.name)
-                    self.addChild(child)
+                    child = children.get(dataset.name)
+                    if child is None:
+                        child = SpectrumTreeItem(path=self.path,is_content=True, label=dataset.name)
+                        self.addChild(child)
                     child._populate_with_data(dataset, label="spectrum")
             else:
                 self._populate_with_data(datasets[0], label="spectrum")
@@ -362,16 +366,21 @@ class SpectrumTreeItem(QTreeWidgetItem):
         shift = tree.window().wl_shift.value() if tree is not None else 0
         
         if np.ndim(y)> 1:
+            children = {self.child(i).content_num:self.child(i) for i in range(self.childCount())}
             for i in range(y.shape[1]):
-                child = SpectrumTreeItem(self.path,label=dataset.name if label is None else label,content_num=i, is_content=True)
-                self.addChild(child)
+                child = children.get(i)
+                if child is None:
+                    child = SpectrumTreeItem(self.path,label=dataset.name if label is None else label,content_num=i, is_content=True)
+                    self.addChild(child)
                 child.set_spectrum(
                     x,
                     y[:,i],
                     shift=shift,
                     bg = dataset.background
                 )
+                child.set_background(None) # clear exisiting external backgrounds if any, relevant for pre-existing children.
             self.is_loaded = True
         else:
             self.is_content = True # needed to force non-nested files to plot their data, without adding a child node.
             self.set_spectrum(x,y,shift=shift,bg=dataset.background,name=None,bg_is_internal=dataset.has_background)
+        self.set_background(None)

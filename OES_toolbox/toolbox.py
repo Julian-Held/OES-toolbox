@@ -702,28 +702,18 @@ class Window(QMainWindow):
                 self.file_list.itemFromIndex(current_index).remove()
 
     def on_reload_file_action(self, file_item:SpectrumTreeItem):
-        was_plotted = file_item.is_plotted(self.specplot)
-        was_selected = (file_item in self.file_list.selectedItems())
+        """Reload data from disk for the specified item.
+        
+        Will update data for pre-existing children, meaning that plotted data is updated automatically.
+
+        These should be no need to check if items are plotted or selected/active.
+        """
         file_item.is_loaded = False
-        file_item.clear_children()
-        if was_plotted:
-            self.plot_filetree_item(file_item)
-        else:
-            if (not file_item.is_loaded) & (file_item.is_file):
-                try:
-                    file_item.load_data()
-                except (AttributeError,UnboundLocalError):
-                    self.status_msg.setText(f"Could not load data from {file_item.path.name}")
-                    return
-                self.status_msg.setText(f"Loading file {file_item.path.name} complete!")
-        if was_selected and not was_plotted:
-            self.on_selection_change()
-        if file_item.childCount()==0:
-            file_item.set_background(None)
+
+        file_item.load_data()
         self.update_spec_colors()
-        self.bg_extra_ledit.setText("")
-        self.bg_extra_check.setChecked(False)
-        self.bg_extra_check.setEnabled(False)
+        # Don't do this (below), the loaded file may not be the currently selected one
+        # self.on_current_item_changed(file_item,file_item)
 
 
     def cont_fit_results_rightClick(self, cursor):
