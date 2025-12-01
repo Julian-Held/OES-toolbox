@@ -147,7 +147,7 @@ class Window(QMainWindow):
         self.bg_internal_check.stateChanged.connect(self.update_spec)
         # self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
         # self.bg_extra_btn.clicked.connect(self.on_open_bg_file)
-        self.bg_extra_check.stateChanged.connect(self.on_bg_check_change)
+        self.bg_extra_check.checkStateChanged.connect(self.on_bg_check_change) # stateChanged is deprecated
         self.reload_file_btn.clicked.connect(lambda: self.on_reload_file_action(self.file_list.selectedItems()[0]))
         self.clear_file_btn.clicked.connect(self.on_file_clear_action)
         
@@ -436,18 +436,44 @@ class Window(QMainWindow):
 ##############################################################################
     
     def on_current_item_changed(self,current:SpectrumTreeItem,previous:SpectrumTreeItem):
+        """Update the 'node info' box with the data for the current selected item in the tree, even when plotting in 'checked' mode.
+
+        Callback runs whenever the current selected item changes in the file tree.
+        
+        Note: this is a single item, the most recently selected among all selected items.
+        """
         if (previous is not None) and isinstance(previous._external_bg,SpectrumTreeItem):
-            previous._external_bg.setIcon(0,previous._external_bg._ICON_FILE_CACHED if previous._external_bg.is_file_node_item else QtGui.QIcon())
+            previous._external_bg.setIcon(0,previous._external_bg._ICON_BG_ACTIVE if isinstance(previous._external_bg,SpectrumTreeItem) else QtGui.QIcon())
             previous._external_bg.setStatusTip(0,None)
         if current is not None:
             if isinstance(current._external_bg, SpectrumTreeItem):
-                bg_path = current._external_bg.path.as_posix()
+                bg_path = current._external_bg.name()
                 current._external_bg.setIcon(0,current._ICON_BG)
                 current._external_bg.setStatusTip(0,"Active background spectrum")
             else:
                 bg_path = ""
-
-
+            # Shortened name is often ambiguous, (many items can be named spectrum 1 )
+            # Use full name of item to retain some info from the hierarchy, and elide left (see below)
+            item_name = current.name(shorten=False)
+            reload_allowed=current.is_file_node_item
+            clear_allowed = current.is_file_node_item
+            self.bg_extra_check.blockSignals(True)
+            self.bg_extra_check.setChecked(isinstance(current._external_bg,SpectrumTreeItem))
+            self.bg_extra_check.blockSignals(False)
+            self.bg_extra_check.setEnabled(isinstance(current._external_bg,SpectrumTreeItem))  
+        else:
+            bg_path = ""
+            item_name = ""
+            clear_allowed=False
+            reload_allowed = False
+    
+        self.clear_file_btn.setEnabled(clear_allowed)
+        self.reload_file_btn.setEnabled(reload_allowed)
+        self.bg_extra_ledit.setText(bg_path)
+        # Use elide left to fit the label, by truncating at the left with ellipsis (...) what does not fit
+        item_name = self.sel_spec_label.fontMetrics().elidedText(item_name,Qt.TextElideMode.ElideLeft,int(self.sel_spec_label.width()*0.92))
+        self.sel_spec_label.setText(item_name)
+        self.spec_info_gbox.setEnabled(True) # better to always be enabled, lest enabling/disabling other widget has little effect for interaction
 
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
         """Loads file and plots content."""
@@ -480,9 +506,12 @@ class Window(QMainWindow):
                 self.on_check_change(item, 0)
 
 
-    def update_file_info_box(self, selected):
+    def update_file_info_box(self):
+        self.logger.warning("`update_file_info_box` was called by %s but is currently disabled in favour of `on_current_item_changed`.")
+        return
+        selected = self.file_list.selectedItems()
         if len(selected) == 1:
-            this_item = selected[0]
+            this_item = self.file_list.currentItem()
             self.spec_info_gbox.setEnabled(True)
             self.sel_spec_label.setText(this_item.name(shorten=True))
             self.reload_file_btn.setEnabled(this_item.is_file_node_item)
@@ -655,16 +684,15 @@ class Window(QMainWindow):
         menu.exec(QtGui.QCursor.pos())
 
     def on_set_background_action(self,item:SpectrumTreeItem):
+        """Set the background for either all selected or checked items, depending on the plot mode."""
         update_on_selected = self.plot_combobox.currentIndex() == 0
         flag = QTreeWidgetItemIterator.IteratorFlag.Selected if update_on_selected else QTreeWidgetItemIterator.IteratorFlag.Checked
         iterator =  QTreeWidgetItemIterator(self.file_list,flag)
         while iterator.value():
             some_item:SpectrumTreeItem = iterator.value()
+            # FIXME: icon interaction in `set_background` can result in leaf nodes still showing a background icon even when cleared
             some_item.set_background(item)
             iterator += 1
-        self.bg_extra_ledit.setText("" if item is None else item.name())
-        self.bg_extra_check.setChecked(isinstance(item,SpectrumTreeItem))
-        self.bg_extra_check.setEnabled(isinstance(item,SpectrumTreeItem))
 
 
     def on_file_clear_action(self,*args): 
