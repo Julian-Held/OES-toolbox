@@ -556,13 +556,19 @@ class Window(QMainWindow):
                 viewbox.autoRange()
                 self.logger.debug(f"Autoranging-> {autorange_state=}")
             viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
-        self.update_file_info_box(selected)
         self.update_spec_colors()
 
 
     def on_bg_check_change(self, checked):
-        if not checked:
-              self.on_set_background_action(None)
+        """Toggles a background off for the current active item in the 'node info' box.
+        
+        It can only toggle (and clear) backgrounds since it will be disabled, and clear the external background.
+        """
+        if checked == Qt.CheckState.Unchecked:
+            # self.on_set_background_action(None) # Don't use `on_set_background_action` which will iterate over active items.
+            item:SpectrumTreeItem = self.file_list.currentItem()
+            item.set_background(None) # Will clear background for this node and children (if any).
+            self.on_current_item_changed(item,None) # this will be the current item, so correct to update now
 
 
     def on_check_change(self, item, col):
