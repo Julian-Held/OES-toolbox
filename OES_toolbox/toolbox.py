@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QDialogButtonBox, QLabel, QMenu,QTreeWidget,QInputDialog, \
         QProgressBar,QMessageBox
 from PyQt6.QtCore import Qt, QSettings, \
-        QStandardPaths, QFile,QTimer
+from PyQt6 import QtCore
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph as pg
@@ -458,7 +458,7 @@ class Window(QMainWindow):
                 self.status_msg.setText(f"Could not load data from {this_item.path.name}")
                 return
             self.status_msg.setText(f"Loading file {this_item.path.name} complete!")
-        this_item.add_to_graph(self.specplot)
+        this_item.add_to_graph()
                 
     def update_spec(self):
         """Checks which files are selected for plotting, loads and plots them."""
@@ -517,8 +517,8 @@ class Window(QMainWindow):
             while iterator.value():
                 this_item:SpectrumTreeItem = iterator.value()
                 iterator += 1
-                if not this_item._is_selected_with_ancestors():
-                    this_item.remove_from_graph(self.specplot)
+                if not this_item.is_active(with_ancestors=True):
+                    this_item.remove_from_graph()
             for this_item in selected:
                 if not this_item.is_dir:
                     self.plot_filetree_item(this_item)
@@ -543,16 +543,15 @@ class Window(QMainWindow):
             autorange_flag: bool = True in autorange_state
             if autorange_flag:
                 viewbox.disableAutoRange()
-            check_state: bool = item.checkState(col) == Qt.CheckState.Checked
-            if check_state | item._is_checked_with_ancestors():
+            if item.checked| item.is_active(with_ancestors=True):
                 self.plot_filetree_item(item)
             else:
-                item.remove_from_graph(self.specplot)
+                item.remove_from_graph()
                 # persist checked children
                 for i in range(item.childCount()):
                     child = item.child(i)
                     if child.checkState(col) == Qt.CheckState.Checked:
-                        child.add_to_graph(self.specplot)
+                        child.add_to_graph()
             if autorange_flag:
                 viewbox.autoRange()
                 self.logger.debug(f"Autoranging-> {autorange_state=}")

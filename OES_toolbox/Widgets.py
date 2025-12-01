@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
 from PyQt6.QtGui import QAction,QIcon
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 import pyqtgraph as pg
 import qtawesome as qta
 
@@ -43,15 +43,13 @@ class SpectrumTreeItem(QTreeWidgetItem):
         # self.bg = kwargs.pop('bg',0 if self._y is not None else None)
 
         self.graph = pg.PlotDataItem(x=np.zeros(1), y=np.zeros(1), name=self.label, skipFiniteCheck=True)
-        self._data_has_been_loaded = False
-        
-        
+        self._data_has_been_loaded = False        
         self.shift = 0
     
         self.setText(0,self.name())
         self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         self.setCheckState(0, Qt.CheckState.Unchecked)
-        self._cb_shift = None
+        self._cb_shift = None # handle for shift callback/connection
         if self.path.is_dir():
             self.setIcon(0,self._ICON_FOLDER)
         if self.path.is_file() & (not self.is_content): # Not parented yet, so cannot check `self.is_file_node_item`
@@ -74,6 +72,25 @@ class SpectrumTreeItem(QTreeWidgetItem):
         parent: SpectrumTreeItem|None = self.parent()
         answer = self.isSelected() if parent is None else (True is parent._is_selected_with_ancestors())
         return answer |  self.isSelected()
+    
+    def is_active(self,with_descendants=False,with_ancestors=False):
+        """Determines if an item is active, by checking it and it's decendants/or ancestors.
+        
+        Takes into account the current plot settings in the user interface.
+        """
+        mw = self.treeWidget().window()
+        plot_selected = mw.plot_combobox.currentIndex()==0
+        active = self.isSelected() if plot_selected else self.checked
+        # Different options OR'd to check in both directions along the tree
+        if with_descendants and plot_selected:
+            active = active | self._is_selected_with_descendants()
+        if with_descendants and not plot_selected:
+            active = active | self._is_checked_with_descendants()
+        if with_ancestors and plot_selected:
+            active = active | self._is_selected_with_ancestors()
+        if with_ancestors and not plot_selected:
+            active = active | self._is_checked_with_ancestors()
+        return active
     
     def name(self, shorten=False):
         if self.is_dir:
@@ -203,7 +220,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
     def set_background(self, bg):
         """"Update the (internal, or external) background of the spectrum and update the plot.
         
-        Will mark the currently selected background for this spectrum by using a boldface font, changing the previous the normal face.
+        Will mark the currently selected background for this spectrum with a `_ICON_FILE_CACHED` icon, clearing the icon for the previous background item.
 
         Will traverse the hierarchy down to descendants, if present.
         """
@@ -221,7 +238,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 # only update backgrounds when shape matches, or is a constant.
                 if is_external or clear_external_bg:
                     if isinstance(self._external_bg,SpectrumTreeItem):
-                        self._external_bg.setIcon(0,self._external_bg._ICON_FILE_CACHED if self._external_bg.is_file_node_item else QIcon())
+                        self._external_bg.setIcon(0,QIcon()) # Simply clear icon here, will update correctly when selections changes/updates by user.
                         self._external_bg.setStatusTip(0,None)
                     self._external_bg = bg
                     if is_external:
@@ -240,17 +257,24 @@ class SpectrumTreeItem(QTreeWidgetItem):
                 self.child(i).set_background(bg)
 
 
-    def add_to_graph(self, plot):
+    def add_to_graph(self, plot=None):
+        """Adds a graph to the central spectrum plot widget, unless another plot is provided."""
         if self.childCount() == 0:
+            plot = self.treeWidget().window().specplot if plot is None else plot
             if (self.graph not in plot.allChildItems()) & (self.is_content):
                 plot.addItem(self.graph)
                 self.shift_wavelength(plot.window().wl_shift.value())
+                # window lookup must use the plot or self.treeWidget()
                 self._cb_shift = plot.window().wl_shift.sigValueChanged.connect(self.shift_wavelength)
         else:
             for i in range(self.childCount()):
                 self.child(i).add_to_graph(plot)
 
     def remove_from_graph(self, plot=None):
+        """Removes a line graph from its corresponding plot widget.
+        
+        Passing another `plot` as an argument only makes sense if it is part of this plot.
+        """
         plot = self.graph.getViewWidget() if plot is None else plot
         if self.childCount()==0:
             if plot is not None:
@@ -259,7 +283,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
                     plot.window().wl_shift.disconnect(self._cb_shift)
         else:
             for i in range(self.childCount()-1,-1,-1):
-                self.child(i).remove_from_graph(plot)
+                self.child(i).remove_from_graph()
 
     def remove(self, *args):       
         if self.parent() is not None:
@@ -331,6 +355,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         y = dataset.y
         tree = self.treeWidget()
         shift = tree.window().wl_shift.value() if tree is not None else 0
+        
         if np.ndim(y)> 1:
             for i in range(y.shape[1]):
                 child = SpectrumTreeItem(self.path,label=dataset.name if label is None else label,content_num=i, is_content=True)
