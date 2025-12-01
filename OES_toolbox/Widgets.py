@@ -141,11 +141,12 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     @property
     def x(self):
-        return self._x
+        return self._x + self.shift
 
     @property
     def y(self):
-        return self._y
+        y = self._y-self.bg
+        return np.nan_to_num(y /self.calib(self.x),posinf=0,neginf=0) if self.calib is not None else y
 
     @property
     def bg(self):
@@ -163,12 +164,14 @@ class SpectrumTreeItem(QTreeWidgetItem):
         It is implicitly assumed that the internal background is of correct dimensions, as it is tightly associated with the data.
         """
         #TODO: revisit this mechanism of internal+external background
-        bg_ext = self._external_bg.y-self._external_bg._internal_bg if isinstance(self._external_bg,SpectrumTreeItem) else self._external_bg
+        if self._external_bg==self: # Avoid recursion when checking with self            
+            # ignore interal bg, else y-bg!=0
+            return self._y # -self._internal_bg
+        bg_ext = self._external_bg._y-self._external_bg._internal_bg if isinstance(self._external_bg,SpectrumTreeItem) else self._external_bg
             
         if (np.shape(bg_ext) == np.shape(self._y)) or (np.shape(bg_ext)==0):
             return self._internal_bg+bg_ext
-        else:
-            return self._internal_bg
+        return self._internal_bg
 
     @property
     def spectrum(self):
@@ -214,7 +217,7 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self._x = x#[~np.isnan(x)]
         self._y = y#[~np.isnan(y)]
         self._internal_bg = bg
-        self.graph.setData(x + self.shift, y - self.bg, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
+        self.graph.setData(x, y, skipFiniteCheck=True, name=f"file: {self.name()}", **kwargs)
         self.is_loaded = True
 
     def set_background(self, bg):
@@ -247,7 +250,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
                         bg.setStatusTip(0,"Active background spectrum")
                 else:
                     self._internal_bg = bg_values
-                self.graph.setData(self.x+self.shift, self.y-self.bg)
+                self.graph.setData(self.x, self.y)
+                
             else:
                 self.logger.info(f"Cannot set background, inappropriate shape: {np.shape(bg_values)=} vs. {np.shape(self._y)=}")
         else: 
@@ -302,7 +306,8 @@ class SpectrumTreeItem(QTreeWidgetItem):
             new = sender.value() if not isinstance(sender,float) else sender
             self.shift = new
             if self.x is not None:
-                self.graph.setData(self.x + new, self.y - self.bg, skipFiniteCheck=True)
+                self.graph.setData(self.x, self.y, skipFiniteCheck=True)
+                
 
     def clear_tree(self):
         tree = self.treeWidget()
