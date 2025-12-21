@@ -318,7 +318,7 @@ class molecule_module():
 
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked() and mol_sel.can_fit == True:
-                mol_sel.load_db((x[0], x[-1]))
+                mol_sel.load_db((x.min(), x.max())) # `x` is not guaranteed to be sorted/increasing
                 y0 = A0*get_mOES_spec(x, Tvib0, Trot0, mol_sel, self.get_instr)
                 A0 = A0*np.max(y)/np.max(y0)
 
