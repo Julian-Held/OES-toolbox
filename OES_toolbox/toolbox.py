@@ -443,7 +443,12 @@ class Window(QMainWindow):
         Note: this is a single item, the most recently selected among all selected items.
         """
         if (previous is not None) and isinstance(previous._external_bg,SpectrumTreeItem):
-            previous._external_bg.setIcon(0,previous._external_bg._ICON_BG_ACTIVE if isinstance(previous._external_bg,SpectrumTreeItem) else QtGui.QIcon())
+            icon = QtGui.QIcon()
+            if isinstance(previous._external_bg._external_bg,SpectrumTreeItem):
+                icon = previous._ICON_BG_ACTIVE
+            elif previous._external_bg.is_file_node_item and previous._external_bg.is_loaded:
+                icon = previous._ICON_FILE_CACHED
+            previous._external_bg.setIcon(0,icon)
             previous._external_bg.setStatusTip(0,None)
         if current is not None:
             if isinstance(current._external_bg, SpectrumTreeItem):
@@ -452,6 +457,8 @@ class Window(QMainWindow):
                 current._external_bg.setStatusTip(0,"Active background spectrum")
             else:
                 bg_path = ""
+                if current.is_file:
+                    current.setIcon(0,current._ICON_FILE_CACHED if current.is_file_node_item else QtGui.QIcon())
             # Shortened name is often ambiguous, (many items can be named spectrum 1 )
             # Use full name of item to retain some info from the hierarchy, and elide left (see below)
             item_name = current.name(shorten=False)

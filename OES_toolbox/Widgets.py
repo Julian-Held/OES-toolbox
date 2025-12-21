@@ -221,44 +221,69 @@ class SpectrumTreeItem(QTreeWidgetItem):
         self.is_loaded = True
 
     def set_background(self, bg):
-        """"Update the (internal, or external) background of the spectrum and update the plot.
-        
-        Will mark the currently selected background for this spectrum with a `_ICON_FILE_CACHED` icon, clearing the icon for the previous background item.
+        """"Update the (internal, or external) background, or clear it, for the spectrum and update the plot.
 
         Will traverse the hierarchy down to descendants, if present.
+
+        Will update the icon of the previous external background (if present), based on if it has a background itself, or is a file.
+
+        Will mark the current background item (if an external SpectrumTreeItem) with an icon and statustip.
+
+        If a file is marked for a background, which is not loaded, this will be loaded first.
         """
         # Assume external background when another SpectrumTreeItem is provided.
         is_external = isinstance(bg,SpectrumTreeItem)
         if is_external and not bg.is_loaded:
             bg.load_data()
+            self.logger.info("Had to load external background file first. This could lead to unexpected backgrounds depending in file content.")
+            if bg.childCount()>0:
+                while bg.childCount()>0:
+                    bg = bg.child(0)
+                self.logger.warning("Attempting to select a background from not-yet-loaded file that contained multiple spectra. In the future, first load the file to guarantee the correct spectrum is used.")
         # Assume external background is to be cleared when None
         clear_external_bg = bg is None
-        if self.childCount()==0:
-            bg_values = 0 if clear_external_bg else bg.y - bg._internal_bg if is_external else bg
-            if clear_external_bg:
-                self.setIcon(0,self._ICON_FILE_CACHED if self.is_file_node_item else QIcon())
-            if (np.shape(bg_values)==np.shape(self._y)) or (len(np.shape(bg_values))==0):
-                # only update backgrounds when shape matches, or is a constant.
-                if is_external or clear_external_bg:
-                    if isinstance(self._external_bg,SpectrumTreeItem):
-                        self._external_bg.setIcon(0,QIcon()) # Simply clear icon here, will update correctly when selections changes/updates by user.
-                        self._external_bg.setStatusTip(0,None)
-                    self._external_bg = bg
-                    if is_external:
-                        bg.setIcon(0,self._ICON_BG)
-                        self.setIcon(0,self._ICON_BG_ACTIVE)
-                        bg.setStatusTip(0,"Active background spectrum")
-                else:
-                    self._internal_bg = bg_values
-                self.graph.setData(self.x, self.y)
-                
-            else:
-                self.logger.info(f"Cannot set background, inappropriate shape: {np.shape(bg_values)=} vs. {np.shape(self._y)=}")
-        else: 
+        if clear_external_bg:
+            self.setIcon(0,self._ICON_FILE_CACHED if self.is_file_node_item else QIcon())
+        if self.childCount()>0:
             if is_external or clear_external_bg:
-                self._external_bg = bg
+                if clear_external_bg and isinstance(self._external_bg,SpectrumTreeItem):
+                    self._external_bg.setIcon(0,self._ICON_BG_ACTIVE if isinstance(self._external_bg._external_bg,SpectrumTreeItem) else QIcon()) 
+                    self._external_bg.setStatusTip(0,None)
+                # The line below will cause improperly shaped backgrounds to still be marked as background on a file node without children
+                # Since no data is stored on a file node with children, we don't know ahead of time if shapes match
+                # Plus the shape of each child may be different, so in some cases they may match
+                # The childen will mark this correctly (if the parent is not selected)
+                # Conclusion: this behaviour seems like a minor issue that would be hard to avoid in a general sense.
+                self._external_bg = bg 
             for i in range(self.childCount()):
                 self.child(i).set_background(bg)
+            return
+        # From here leaf nodes without children
+        bg_values = 0 if clear_external_bg else (bg.y - bg._internal_bg if is_external else bg)
+        if not (np.shape(bg_values)==np.shape(self._y) or len(np.shape(bg_values))==0):
+            self.logger.info(f"Cannot set background, inappropriate shape: {np.shape(bg_values)=} vs. {np.shape(self._y)=}")
+            return
+        # only updating backgrounds when shape matches, or is a constant.
+        if is_external or clear_external_bg:
+            if self == self._external_bg and clear_external_bg:
+                self.setIcon(0,self._ICON_FILE_CACHED if self.is_file_node_item else QIcon())
+                self.setStatusTip(0,None)
+            elif isinstance(self._external_bg,SpectrumTreeItem) and self.is_active():
+                icon = QIcon()
+                if isinstance(self._external_bg._external_bg,SpectrumTreeItem):
+                    icon = self._ICON_BG_ACTIVE
+                elif self._external_bg.is_file_node_item:
+                    icon = self._ICON_FILE_CACHED                        
+                self._external_bg.setIcon(0,icon) 
+                self._external_bg.setStatusTip(0,None)
+            self._external_bg = bg # finally update background
+            if is_external:
+                bg.setIcon(0,self._ICON_BG)
+                self.setIcon(0,self._ICON_BG_ACTIVE)
+                bg.setStatusTip(0,"Active background spectrum")
+        else:
+            self._internal_bg = bg_values
+        self.graph.setData(self.x, self.y)
 
 
     def add_to_graph(self, plot=None):
