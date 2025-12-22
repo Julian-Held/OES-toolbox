@@ -103,6 +103,10 @@ class FileLoader:
         """Infer the format and read from a generic text file.
         
         Intedend as a catch-all reader for any text format that does not require bespoke parsing.
+
+        It is implicitly assumed that the first line that starts with numeric data, is the start of the data block.
+
+        All data in the datablock is assumed to be numeric/float.
         """
         f = Path(f)
         with f.open("rb") as fo:
@@ -114,6 +118,7 @@ class FileLoader:
         with f.open("r", encoding=enc) as fo:
             pos = []
             line_num = 0
+            offset_data=0
             while line_num < 50:
                 cursor = fo.tell()
                 pos.append(cursor)
@@ -127,16 +132,18 @@ class FileLoader:
             cls.logger.debug(f"{f.name}: {enc}, {sep=}, {decimal=}, {offset_data=}")
             df = cls._parse_open_text_file(fo,offset_data,sep,decimal, on_bad_lines='skip')
             # determine column names if any
-            fo.seek(pos[pos.index(offset_data)-1])
-            heading_line = fo.readline().strip()
-            if heading_line =="":
-                fo.seek(pos[pos.index(offset_data)-2])
+            heading_line = ""
+            if offset_data>0:
+                idx = pos.index(offset_data)-1
+                fo.seek(pos[idx])
                 heading_line = fo.readline().strip()
-            
-            if sep in heading_line:
-                names = [part.strip() for part in heading_line.split(sep) if part.strip()!=""]
-                if (len(names)==df.shape[1]) & (np.unique(names).shape[0]==len(names)):
-                    df.columns = names
+                if heading_line.replace(sep,"").strip() =="" and idx>0: # empty line, look one line further back if possible
+                    fo.seek(pos[idx-1])
+                    heading_line = fo.readline().strip()
+                if sep in heading_line:
+                    names = [part.strip() for part in heading_line.split(sep) if part.strip()!=""]
+                    if (len(names)==df.shape[1]) & (np.unique(names).shape[0]==len(names)):
+                        df.columns = names
             return df
 
     @classmethod
