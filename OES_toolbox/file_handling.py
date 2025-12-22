@@ -1,20 +1,19 @@
 """"Core module for file handling.
 
 Whenever a new file-type needs to be supported, this is the place to start.
+
+Make sure not to introduce dependencies on Qt or GUI interaction here.
+
+This allows the file handling logic to be used separately, and allows runnings tests on headless runners.
 """
 
 from pathlib import Path
 import time
 import re
-from PyQt6.QtGui import QImage
-from matplotlib.figure import Figure
 import sif_parser
 from OES_toolbox import pyAvantes
 import numpy as np
-# import pandas as pd
-# import xarray as xr
 from charset_normalizer import is_binary, from_bytes, from_fp
-# from spexread.parsing import read_spe_file
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,7 +26,6 @@ from OES_toolbox.lazy_import import lazy_import
 pd = lazy_import("pandas")
 xr = lazy_import("xarray")
 spexread = lazy_import("spexread")
-
 
 class SpectraDataset:
     """A dataset of spectra recorded with the same wavelength axis and/or region of interest.
@@ -275,61 +273,3 @@ class FileLoader:
         return spectra
 
 
-class FileExport:
-
-    @staticmethod
-    def graph_to_matplotlib(graph) -> Figure:
-        import matplotlib.pyplot as plt
-        from PyQt6.QtCore import Qt
-        plt.style.use(Path(__file__).parent.joinpath('ui/jh-paper.mplstyle'))
-        xlim,ylim = graph.getViewBox().viewRange()
-        fig = plt.figure()
-        count = 0
-        for plot_item in graph.listDataItems():
-            pen = plot_item.opts['pen']            
-            style_kws = {
-                "c":pen.color().name(), 
-                "zorder":plot_item.zValue(),
-                "label": plot_item.name(),
-                "lw": pen.width(),
-            }
-            match pen.style().name.lower():
-                case "solidline":
-                    style_kws['ls'] = "-"
-                case "dotline":
-                    style_kws['ls'] = ":"
-                case 'dashline':
-                    style_kws['ls'] = "--"
-                case "nopen":
-                    style_kws['ls']=''
-            if plot_item.name().startswith("file"):
-                style_kws["label"]=plot_item.name().strip("file:").strip()
-            if plot_item.name().startswith("cont"):
-                style_kws["lw"] = 1
-            elif plot_item.name().startswith('NIST'):
-                style_kws["lw"] = 0.5
-            x,y = plot_item.getData()
-            plt.plot(x,y,**style_kws)
-            count += 1
-        plt.xlim(xlim)
-        plt.ylim(ylim)
-        # if count>1:
-        if graph.plotItem.legend.isVisible():
-            plt.legend()
-        plt.xlabel("Wavelength / nm")
-        plt.ylabel("Intensity")
-        return fig
-    
-    @staticmethod
-    def matplotlib_to_image(fig) -> QImage:
-        from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-        from PyQt6.QtGui import QImage, QPixmap
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        img = QImage(
-            canvas.buffer_rgba(), 
-            int(fig.figbbox.width),
-            int(fig.figbbox.height),
-            QImage.Format.Format_RGBA8888_Premultiplied
-        )
-        return img

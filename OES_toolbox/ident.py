@@ -47,7 +47,7 @@ class NISTloader(QObject):
         self.finished.emit()
 
 
-class ident_module():
+class ident_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
 
@@ -169,37 +169,3 @@ class ident_module():
         else: # LTE -> show Te input box
             self.mw.ident_Te.show()
             self.mw.ident_Te_label.show()
-            
-            
-    def save_NIST_data(self):
-        seperator = "\t "
-        next_line = " \n"
-        filename = QFileDialog.getSaveFileName(caption='Save File', filter='*.txt')
-
-        if filename[0]:
-
-            header = ("## OES toolbox result file: NIST data ## \n" +
-                        "# " + str(datetime.datetime.now()) + "\n\n")
-                    
-            table_header = ("Ion" + seperator + "wl / nm" +  seperator + 
-                "rel. intensity" + seperator + "Aik" + seperator + "Ek - Ei" + 
-                seperator + "lower configuration" + seperator + 
-                "upper configuration" + seperator +  "\n")
-
-            lines = [header, table_header]
-            for x in range(self.mw.ident_table.rowCount()):
-                this_line = ""
-                for y in range(self.mw.ident_table.columnCount()):
-                    this_line = this_line + str(self.mw.ident_table.item(x,y).text()) + seperator
-                lines.append(this_line + next_line)
-
-            try:
-                f = open(filename[0], 'w', encoding="utf-8")
-                f.writelines(lines)
-            except:
-                    mb = QMessageBox()
-                    mb.setIcon(QMessageBox.Icon.Information)
-                    mb.setWindowTitle('Error')
-                    mb.setText('Could not save file.')
-                    mb.setStandardButtons(QMessageBox.StandardButton.Ok)
-                    mb.exec()       

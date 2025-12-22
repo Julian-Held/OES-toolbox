@@ -23,7 +23,6 @@ file_dir = os.path.dirname(os.path.abspath(__file__))
 
 from .ui import resources # seems unused but is needed!
 from OES_toolbox.settings import settings
-from OES_toolbox.fio import fio
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
@@ -31,6 +30,7 @@ from OES_toolbox.Widgets import SpectrumTreeItem
 from OES_toolbox.logger import Logger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
+from OES_toolbox.exporters import FileExport
 
 from importlib.metadata import metadata
 scipy = lazy_import("scipy")
@@ -57,14 +57,13 @@ class about_dialog(QDialog):
         m = metadata("OES_toolbox")
         self.setWindowTitle("About OES toolbox")
 
-        msg = f"""OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.
-        Powered by owl, Moose/MassiveOES, astroquery and others.
-        Version: {m['version']}
-        {m['License-Expression']} License - Copyright (c) 2024 Julian Held
-        """
+        msg = (f"OES toolbox - Helping out with optical emission spectroscopy of low-temperature plasmas.\n"
+        "Powered by owl, Moose/MassiveOES, astroquery and others.\n\n"
+        f"Version: {m['version']}\n\n"
+        f"{m['License-Expression']} License - Copyright (c) 2024 Julian Held")
         for url in m.get_all("Project-URL"):
             category,link = url.split(', ')
-            msg += f"{category}: {link}\n"
+            msg += f"\n{category}: {link}\n"
 
         QBtn = QDialogButtonBox.StandardButton.Ok
 
@@ -120,7 +119,7 @@ class Window(QMainWindow):
         self.specplot.addLegend()
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
-        self.action_export_plot_data.triggered.connect(self.io.save_plots)
+        self.action_export_plot_data.triggered.connect(lambda: FileExport.save_plot_data(self.specplot))
         self.actionRefresh_plots.triggered.connect(self.update_spec)
         self.proxy = pg.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
         self.actionClear_Plots.triggered.connect(self.clear_all_spec)
@@ -128,8 +127,8 @@ class Window(QMainWindow):
         # file loading, plotting /drag & drop
         self.button_open.clicked.connect(self.actionOpenFolder.trigger)
         self.button_open_files.clicked.connect(self.actionOpenFiles.trigger)
-        self.actionOpenFolder.triggered.connect(self.io.open_folder)
-        self.actionOpenFiles.triggered.connect(self.io.open_files)
+        self.actionOpenFolder.triggered.connect(self.open_folder)
+        self.actionOpenFiles.triggered.connect(self.open_files)
         
         self.file_list.itemSelectionChanged.connect(self.on_selection_change)
         self.file_list.itemChanged.connect(self.on_check_change)
@@ -141,12 +140,9 @@ class Window(QMainWindow):
         self.file_list.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.clear_file_list.clicked.connect(self.actionClearFiles.trigger)
         self.actionClearFiles.triggered.connect(self.on_file_clear_action)
-        # self.file_list.keyPressEvent = self.io.file_list_keys
         self.file_list.keyPressEvent = self.file_list_keys
         self.bg_internal_check.hide()
         self.bg_internal_check.stateChanged.connect(self.update_spec)
-        # self.bg_extra_btn.clicked.connect(self.io.open_bg_file)
-        # self.bg_extra_btn.clicked.connect(self.on_open_bg_file)
         self.bg_extra_check.checkStateChanged.connect(self.on_bg_check_change) # stateChanged is deprecated
         self.reload_file_btn.clicked.connect(lambda: self.on_reload_file_action(self.file_list.selectedItems()[0]))
         self.clear_file_btn.clicked.connect(self.on_file_clear_action)
@@ -182,7 +178,7 @@ class Window(QMainWindow):
         self.ident_Te.hide()
         self.ident_Te_label.hide()
         self.ident_int_cbox.currentIndexChanged.connect(self.ident.ident_int_changed)
-        self.action_export_ident_table.triggered.connect(self.ident.save_NIST_data)
+        self.action_export_ident_table.triggered.connect(lambda : FileExport.save_table(self.ident_table))
         self.ident_clear.clicked.connect(self.actionClear_Ident_Plots.triggered)
         self.actionClear_Ident_Plots.triggered.connect(self.ident.clear_spec_ident)
 
@@ -192,7 +188,7 @@ class Window(QMainWindow):
         self.show_continuum_btn.clicked.connect(self.cont.plot_continuum0)
         self.fit_continuum_btn.clicked.connect(self.cont.fit_continuum)
         self.cont_save_btn.clicked.connect(self.action_export_continuum_fit_results.trigger)
-        self.action_export_continuum_fit_results.triggered.connect(self.cont.save_continuum_results)
+        self.action_export_continuum_fit_results.triggered.connect(lambda: FileExport.save_table(self.cont_fit_results_table))
         self.clear_continuum_btn.clicked.connect(self.actionClear_Continuum_Plots.trigger)
         self.actionClear_Continuum_Plots.triggered.connect(self.cont.clear_continuum)
         self.cont_clear_data_btn.clicked.connect(self.actionClear_Continuum_Table.trigger)
@@ -206,7 +202,7 @@ class Window(QMainWindow):
         self.mol_clear_btn.clicked.connect(self.actionClear_Molecule_Plots.trigger)
         self.actionClear_Molecule_Plots.triggered.connect(self.mol.clear_spec)
         self.mol_save_btn.clicked.connect(self.action_export_molecule_fit_results.trigger)
-        self.action_export_molecule_fit_results.triggered.connect(self.mol.save_results)
+        self.action_export_molecule_fit_results.triggered.connect(lambda: FileExport.save_table(self.mol_fit_results_table))
         self.mol_clear_data_btn.clicked.connect(self.actionClear_Molecule_Table.trigger)
         self.actionClear_Molecule_Table.triggered.connect(self.mol.clear_table)
         self.mol_fit_results_table.customContextMenuRequested.connect(self.mol.fit_results_rightClick)
@@ -355,6 +351,24 @@ class Window(QMainWindow):
             item.set_spectrum(data[roi_idx].x,y,bg=data[roi_idx].background)
             self.on_set_background_action(item)
 
+    def open_folder(self):
+        folder = QFileDialog.getExistingDirectory(caption='Open Folder')
+        if folder =="":
+            return
+        folder = Path(folder)
+        if folder.is_dir():
+            self.active_folder = folder.as_posix()
+        item = SpectrumTreeItem(folder,label="",is_content=False)
+        self.file_list.addTopLevelItem(item)
+        item.iterdir()
+        self.file_list.expandItem(item)
+    
+    def open_files(self):
+        files,filter = QFileDialog.getOpenFileNames(caption='Open Files')
+        for f in files:
+            item = SpectrumTreeItem(Path(f),label="", is_content=False)
+            self.file_list.addTopLevelItem(item)
+
 
 ##############################################################################
 # <------------------------- general plotting -----------------------------> #
@@ -425,7 +439,6 @@ class Window(QMainWindow):
             
             
     def graph_to_clipboard(self):
-        from OES_toolbox.file_handling import FileExport
         fig = FileExport.graph_to_matplotlib(self.specplot)
         img = FileExport.matplotlib_to_image(fig)
         QApplication.clipboard().setImage(img)
@@ -633,7 +646,7 @@ class Window(QMainWindow):
     def do_drag_drop(self, event):
         for url in event.mimeData().urls():
             path = Path(url.toLocalFile())
-            item = self.filetree_item(path)
+            item = SpectrumTreeItem(path,label="",is_content=False)
             item.iterdir()
             self.file_list.addTopLevelItem(item)
         event.accept()

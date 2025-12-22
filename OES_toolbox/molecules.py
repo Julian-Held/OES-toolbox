@@ -488,40 +488,6 @@ class molecule_module():
         self.mw.mol_fit_results_table.removeRow(row)
 
 
-    def save_results(self):
-        seperator = "\t "
-        next_line = " \n"
-        filename = QFileDialog.getSaveFileName(caption='Save File',
-            filter='*.txt')
-        table_header = ""
-
-        if filename[0]:
-
-            header = ("## OES toolbox result file: molecular band emission fit ## \n" +
-                      "# " + str(datetime.datetime.now()) + "\n\n")
-                    
-            for i in range(0, self.mw.mol_fit_results_table.columnCount()):
-                table_header = table_header + self.mw.mol_fit_results_table.horizontalHeaderItem(i).text() + seperator
-
-            lines = [header, table_header + " \n"]
-            for x in range(self.mw.mol_fit_results_table.rowCount()):
-                this_line = ""
-                for y in range(self.mw.mol_fit_results_table.columnCount()):
-                    this_line = this_line + str(self.mw.mol_fit_results_table.item(x,y).text()) + seperator
-                lines.append(this_line + next_line)
-
-            try:
-                f = open(filename[0], 'w', encoding="utf-8")
-                f.writelines(lines)
-            except:
-                 mb = QMessageBox()
-                 mb.setIcon(QMessageBox.Icon.Information)
-                 mb.setWindowTitle('Error')
-                 mb.setText('Could not save file.')
-                 mb.setStandardButtons(QMessageBox.StandardButton.Ok)
-                 mb.exec()
-
-
     def fit_results_rightClick(self, cursor):
         row = self.mw.mol_fit_results_table.rowAt(cursor.y())
         # col = self.mol_fit_results_table.columnAt(cursor.x())
