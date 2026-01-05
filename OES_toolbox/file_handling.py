@@ -204,7 +204,7 @@ class FileLoader:
 
     @classmethod
     def read_PI_spe(cls, f: Path)->list["DataArray"]:
-        return spexread.parsing.read_spe_file(f,as_dataset=False)
+        return spexread.parsing.read_spe_file(f,as_dataset=False, strict=False)
 
     @classmethod
     def read_netCDF(cls, f:Path):

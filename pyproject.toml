@@ -34,7 +34,7 @@ dependencies = [
     "xarray>=2025.4.0",
     "h5netcdf>=1.6.0",
     "charset-normalizer>=3.4.0",
-    "spexread @ git+https://github.com/AntoineTUE/spexread",
+    "spexread>=0.2.1",
     "qtawesome>=1.4.0",
     "avaread>=0.2.0",
 ]
