@@ -36,6 +36,7 @@ dependencies = [
     "charset-normalizer>=3.4.0",
     "spexread @ git+https://github.com/AntoineTUE/spexread",
     "qtawesome>=1.4.0",
+    "avaread>=0.2.0",
 ]
 
 [project.scripts]

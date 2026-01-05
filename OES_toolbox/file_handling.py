@@ -11,10 +11,11 @@ from pathlib import Path
 import time
 import re
 import sif_parser
-from OES_toolbox import pyAvantes
 import numpy as np
 from charset_normalizer import is_binary, from_bytes, from_fp
 from typing import TYPE_CHECKING
+import avaread
+from avaread.reader import AVSFile, STRFile
 
 if TYPE_CHECKING:
     from xarray import DataArray,Dataset
@@ -152,8 +153,8 @@ class FileLoader:
         return data
 
     @classmethod
-    def read_avantes_raw8(cls, f: Path) -> pd.DataFrame:
-        data = pd.DataFrame(pyAvantes.Raw8(f).data)
+    def read_avantes_binary(cls, f: Path) -> AVSFile|STRFile:
+        data = avaread.read_file(f)
         return data
 
     @classmethod
@@ -249,9 +250,12 @@ class FileLoader:
         if b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
-        elif b"AVS" in sample[:3]:
-            data = cls.read_avantes_raw8(f)
-            spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.loc[:, 'scope'], background=data.loc[:,'dark'].to_numpy())]
+        elif any(x in sample[:3] for x in (b"AVS",b"STR")):
+            data = cls.read_avantes_binary(f)
+            if isinstance(data, AVSFile):
+                spectra = [SpectraDataset(x=c.wavelength, y=c.scope, background = c.dark, name=c.ID.SerialNumber) for c in data.channels]
+            elif isinstance(data, STRFile):
+                spectra = [SpectraDataset(x=data.wavelength, y=data.scope, background=data.dark)]
         elif b"Andor Technology Multi-Channel File" in sample:
             data = cls.read_andor_sif(f)
             spectra = [SpectraDataset(x=data[0],y=data[1].sum(axis=1).T)]
