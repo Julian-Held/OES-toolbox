@@ -31,7 +31,7 @@ class FileExport:
     @classmethod
     def get_save_path(cls)-> None|Path:
         """Get a file path for saving a file."""
-        filename,_ = QFileDialog.getSaveFileName(caption='Save File', filter="Apache Parquet (*.par);;Text file (comma-separated)(*.txt *.csv)", directory=cls.lastFolder)
+        filename,_ = QFileDialog.getSaveFileName(caption='Save File', filter="Text file (comma-separated)(*.txt *.csv);;Apache Parquet (*.par)", directory=cls.lastFolder)
         if filename=="":
             return
         filename = Path(filename)
