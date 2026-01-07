@@ -159,9 +159,9 @@ class FileExport:
         else:
             raise ValueError(f"Unknown action name for `save_table`: {action_name=}")
         
-        data = {table.horizontalHeaderItem(c).text(): [table.item(r,c).text().strip() for r in range(table.rowCount())] for c in range(table.columnCount())}
+        data = {table.horizontalHeaderItem(c).text(): [table.item(r,c).text().strip() if table.item(r,c) is not None else "" for r in range(table.rowCount())] for c in range(table.columnCount())}
         df = pd.DataFrame(data)
-        df = df.astype({col:float if col not in ['file',"Ion","conf. lower","conf. upper"] else str for col in df.columns })
+        df = df.convert_dtypes()
         cls.add_attrs(df, kind=kind)
         cls.store_dataframe(filename, df)
 
