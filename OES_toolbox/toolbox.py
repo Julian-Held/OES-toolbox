@@ -586,9 +586,6 @@ class Window(QMainWindow):
                     except Exception as e:
                         # catch and log unhandled exceptions
                         self.logger.error("Exception thrown when reading file \"%s\": \"%s\"", this_item.path.name, repr(e))
-            if autorange_flag:
-                viewbox.autoRange()
-                self.logger.debug(f"Autoranging-> {autorange_state=}")
             viewbox.enableAutoRange(x=autorange_state[0],y= autorange_state[1])
         self.update_spec_colors()
 
