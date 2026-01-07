@@ -91,7 +91,6 @@ class Window(QMainWindow):
         self.logger = Logger(self)
         
         self.settings = settings(self)
-        self.io = fio(self)
         self.mol = molecule_module(self)
         self.ident = ident_module(self)
         self.cont = cont_module(self)
