@@ -162,7 +162,6 @@ class Window(QMainWindow):
         self.open_cal_folder_btn.clicked.connect(self.open_cal_folder)
         self.add_cal_file_btn.clicked.connect(self.add_cal_file)
         self.cal_refresh_btn.clicked.connect(self.cal_files_refresh)
-        self.apply_cal_check.clicked.connect(lambda: self.load_cal_file(self.cal_files_cbox.currentText()))
         self.apply_cal_check.clicked.connect(self.update_spec)
         self.cal_files_cbox.currentTextChanged.connect(self.load_cal_file)
         
@@ -501,10 +500,18 @@ class Window(QMainWindow):
     def plot_filetree_item(self, this_item:SpectrumTreeItem):
         """Loads file and plots content."""
         self.logger.debug(f"{this_item.label}: {this_item.is_loaded=}")
-        if (not this_item.is_loaded) & (this_item.is_file):
+        if this_item.is_dir and this_item.is_active() and self.plot_combobox.currentIndex()==1:
+            # In checked mode, plot the files in a checked folder
+            # Deliberately avoids traversing into subfolders to avoid deeply nested hierarchies freezing application.
+            # This is mainly an issue when working with many files that contain many spectra themselves, which can escallate quickly the amount of items to plot.
+            for idx in range(this_item.childCount()):
+                if this_item.child(idx).is_file_node_item:
+                    self.plot_filetree_item(this_item.child(idx))
+            return
+        if (not this_item.is_loaded) and (this_item.is_file):
             try:
                 this_item.load_data()
-            except (AttributeError,UnboundLocalError, EncodingWarning):
+            except (AttributeError,UnboundLocalError, EncodingWarning,KeyError):
                 self.status_msg.setText(f"Could not load data from {this_item.path.name}")
                 return
             self.status_msg.setText(f"Loading file {this_item.path.name} complete!")
@@ -574,7 +581,11 @@ class Window(QMainWindow):
                     this_item.remove_from_graph()
             for this_item in selected:
                 if not this_item.is_dir:
-                    self.plot_filetree_item(this_item)
+                    try:
+                        self.plot_filetree_item(this_item)
+                    except Exception as e:
+                        # catch and log unhandled exceptions
+                        self.logger.error("Exception thrown when reading file \"%s\": \"%s\"", this_item.path.name, repr(e))
             if autorange_flag:
                 viewbox.autoRange()
                 self.logger.debug(f"Autoranging-> {autorange_state=}")
@@ -602,8 +613,16 @@ class Window(QMainWindow):
             autorange_flag: bool = True in autorange_state
             if autorange_flag:
                 viewbox.disableAutoRange()
-            if item.checked| item.is_active(with_ancestors=True):
-                self.plot_filetree_item(item)
+            if item.checked | item.is_active(with_ancestors=False):
+                try:
+                    # Signals from QTreeWidget must be blocked here, else a recursion occurs when attempting to open unsupported files
+                    # This may be related to checking if an item is active, but requires further investigation (and reworking)
+                    # Blocking signals solves the problem
+                    with QtCore.QSignalBlocker(self.file_list):
+                        self.plot_filetree_item(item)
+                except Exception as e:
+                    # catch and log unhandled exceptions
+                    self.logger.error("Exception thrown when reading file \"%s\": \"%s\"", item.path.name, repr(e))
             else:
                 item.remove_from_graph()
                 # persist checked children

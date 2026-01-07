@@ -361,11 +361,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
         if self.is_file:
             try:
                 datasets = FileLoader.open_any_spectrum(self.path.resolve())
-            except (AttributeError,UnboundLocalError,EncodingWarning,ValueError) as e:
+            # except (AttributeError,UnboundLocalError,EncodingWarning,ValueError,KeyError) as e:
+            except Exception as e:
                 self.setIcon(0,self._ICON_IO_ERROR)
                 self.logger.exception("Could not open file: %s",self.path.name)
-                # raise e
-                return
+                raise e
             if len(datasets)>1:
                 # Figure out which children already exists and update their data, rather then remove-then-add
                 children = {self.child(i).label:self.child(i) for i in range(self.childCount())}
