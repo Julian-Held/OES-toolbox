@@ -470,8 +470,12 @@ class Window(QMainWindow):
                 current._external_bg.setStatusTip(0,"Active background spectrum")
             else:
                 bg_path = ""
-                if current.is_file:
-                    current.setIcon(0,current._ICON_FILE_CACHED if current.is_file_node_item else QtGui.QIcon())
+                if current.is_file_node_item:
+                    current.setIcon(0,current._ICON_FILE_CACHED if current.is_loaded else current._ICON_FILE)
+                elif current.is_dir:
+                    pass
+                else:
+                    current.setIcon(0,QtGui.QIcon())
             # Shortened name is often ambiguous, (many items can be named spectrum 1 )
             # Use full name of item to retain some info from the hierarchy, and elide left (see below)
             item_name = current.name(shorten=False)
