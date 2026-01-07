@@ -248,18 +248,16 @@ class FileLoader:
             df  = pd.read_parquet(f)
         else:
             df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', comment="#")
-        by_file = df['name'].str.strip("file: ").str.split(": ", expand=True) # (file_name, ROI/channel (optional), label)
-        with_nesting = len(by_file.columns)>2
-        by_file.columns = ["file", "ROI", "label"] if with_nesting else ["file", "label"]
-        if not with_nesting:
-            by_file["ROI"] = ""
-        # prioritize 'label' over 'ROI' to be non-empty
-        for n,g in by_file.groupby(['file',"ROI"]):
-            if g.label.nunique()<2:
-                by_file.loc[g.index,"label"]=by_file.loc[g.index,"ROI"]
-                by_file.loc[g.index,"ROI"] = ""
-        for col in by_file.columns:
-            df[col] = by_file[col]
+        df[['file',"ROI", "label"]]=""
+        for n,g in df.groupby("name", sort=False):
+            parts = n.strip("file: ").strip().split(": ")
+            parts = [p.strip() for p in parts]
+            if len(parts)==1:
+                df.loc[g.index,"file"] = parts[0]
+            elif len(parts)==2:
+                df.loc[g.index, ["file","label"]]=parts
+            elif len(parts)==3:
+                df.loc[g.index,["file","ROI","label"]] = parts
         return df
 
     @classmethod
@@ -273,12 +271,14 @@ class FileLoader:
         if ((b"OES toolbox" in sample) and (b"result" in sample)) or (sample.startswith(b"PAR1")):
             data = cls.read_oestoolbox_export(f)
             spectra = []
-            for n, g in data.groupby(["file","ROI"]):
+            # Do not sort during groupby's to preserve order of spectra in file
+            # Else, 'spectrum 10' is sorted before 'spectrum 2', etc.
+            for n, g in data.groupby(["file","ROI"], sort=False):
                 name = ": ".join(n)
                 if g.label.nunique()<2:
                     spectra.append(SpectraDataset(g['wavelength / nm'],g['intensity'],name=name))
                 else:
-                    by_label = g.groupby("label")
+                    by_label = g.groupby("label",sort=False)
                     parts = []                    
                     for i, (_,gg) in enumerate(by_label):
                         if i==0:
