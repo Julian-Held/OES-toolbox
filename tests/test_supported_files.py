@@ -76,8 +76,12 @@ class TestSupportedFiles:
 
         def test_read_avantes_raw8(self,Avantes_raw8_demo_file):
             """Read a file created with AvaSoft 8 with a 'virtual demo spectrometer' (e.g. with no physical device attached.)"""
-            data = FileLoader.read_avantes_raw8(Path("./tests/test_files/Avasoft8_demo.raw8"))
-            assert data.shape == (1615,4)
-            assert list(data.columns) == ['wl', 'scope', 'dark', 'ref']
-            assert_frame_equal(data,Avantes_raw8_demo_file)
-            
+            data = FileLoader.read_avantes_binary(Path("./tests/test_files/Avasoft8_demo.raw8"))
+            assert len(data)==1 # contains 1 channel
+            assert data[0].ID.SerialNumber == '00000000'
+            assert data[0].data.shape == (1615,4) # 4 vectors, wavelength, signal,dark,ref
+            assert data[0]==data.channels[0]
+            assert round(data[0].exposure,8)==1.04999995
+            assert data[0].wavelength.min()==174.029
+            assert data[0].wavelength.max()==1100.3231
+            assert_allclose(data[0].data,Avantes_raw8_demo_file)

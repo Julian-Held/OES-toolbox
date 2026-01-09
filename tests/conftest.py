@@ -47,15 +47,7 @@ def Avantes_raw8_demo_file():
     """A sample file recorded by AvaSoft 8 running in demo mode."""
     file = Path("./tests/test_files/avasoft8_demo.raw8")
     pixel_indices = np.fromfile(file,dtype=np.dtype("H"),offset=89,count=2)
-    data = pd.DataFrame(
-        np.fromfile(
-            file,
-            dtype=np.dtype("<f"),
-            offset=328,
-            count=(np.diff(pixel_indices)+1)[0]*4
-        ).reshape(4,-1).T.astype(float),
-        columns=['wl','scope', 'dark','ref']
-    )
+    data=np.fromfile(file,dtype=np.dtype("<f"), offset=328, count=(np.diff(pixel_indices)+1)[0]*4).reshape(4,-1).T.astype(float)
     yield data
 
 
