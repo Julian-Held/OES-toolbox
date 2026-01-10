@@ -163,6 +163,7 @@ class Window(QMainWindow):
         self.cal_refresh_btn.clicked.connect(self.cal_files_refresh)
         self.apply_cal_check.clicked.connect(self.update_spec)
         self.cal_files_cbox.currentTextChanged.connect(self.load_cal_file)
+        self.cal_files_cbox.currentTextChanged.connect(lambda: self.update_spec() if self.apply_cal_check.isChecked() else None)
         
         
         # line identification
