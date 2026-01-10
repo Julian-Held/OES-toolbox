@@ -156,7 +156,6 @@ class Window(QMainWindow):
         self.actionAbout.triggered.connect(lambda: about_dialog().exec())
 
         # spectromter settings
-        self.groupBox_6.hide() # TODO not a thing yet, hide for now
         self.specopt_axis_group.hide()
         # intensity calibration    
         self.open_cal_folder_btn.clicked.connect(self.open_cal_folder)
