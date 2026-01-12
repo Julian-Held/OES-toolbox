@@ -52,12 +52,37 @@ class FileExport:
             if path.suffix.lower()==".par":
                 data.to_parquet(path)
                 return
+            elif "xls" in path.suffix.lower():
+                    
+                    with pd.ExcelWriter(path, mode="w", engine='xlsxwriter') as writer:
+                        if isinstance(data.columns, pd.MultiIndex):
+                            # write header first to avoid empty row bug after header in pandas for a MultiIndex
+                            data.drop(data.index).to_excel(writer,index_label="Index") 
+                            data.to_excel(writer, startrow=data.columns.nlevels-1, header=False)
+                        else:
+                            data.to_excel(writer,header=True, index=False)
+                        sheet = writer.book.add_worksheet("Export info")
+                        header_format = writer.book.add_format({"bold": True})
+                        sheet.write(0, 0, "OES toolbox version:", header_format)
+                        sheet.write(0, 1, version)
+                        sheet.write(1, 0, "Exported on:", header_format)
+                        sheet.write(1, 1, data.attrs["Exported on"])
+                        sheet.write(2, 0, "Export:", header_format)
+                        sheet.write(2, 1, data.attrs["Result file"])
+                        sheet.set_column_pixels(0, 0, 170)
+                    return
             header = (
                 f"## OES toolbox ({version}) result file: {data.attrs['Result file']} ##\n"
-                f"#  {data.attrs['Exported on']}\n\n"
+                f"#  {data.attrs['Exported on']}\n"
             )
+            if isinstance(data.columns, pd.MultiIndex):
+                # use a space (`\s`) instead of empty string for text export to avoid `Unnamed columns`
+                cols = data.columns.to_frame()
+                for col in cols.columns:
+                    cols[col] = cols[col].replace(""," ")
+                data.columns = pd.MultiIndex.from_frame(cols)
             path.write_text(header,encoding='utf-8')
-            data.to_csv(path,sep=",", decimal=".",encoding="utf-8",mode="a",index=False)
+            data.to_csv(path,sep=",", decimal=".", encoding="utf-8", mode="a", index=isinstance(data.columns, pd.MultiIndex))
         except Exception as e:
             
             QMessageBox.warning(
@@ -123,23 +148,21 @@ class FileExport:
         filename = cls.get_save_path()
         if filename is None:
             return
-        ys = []
-        xs = []
-        names = []
+        xlabel = plot.getAxis("bottom").label.toPlainText().strip()
+        ylabel = plot.getAxis("left").label.toPlainText().strip()
+        data = []
         for plot_item in plot.listDataItems():
             x,y = plot_item.getData()
-            xs.append(x)
-            ys.append(y)
-            names.append(plot_item.name())
+            part_names = [part.strip() for part in plot_item.name().split(": ")]
+            match len(part_names):
+                case 2:
+                    part_names.extend([""] * 2)
+                case 3:
+                    part_names.insert(2, "")
+            data.append(pd.DataFrame({(*part_names,label):values for label, values in zip([xlabel,ylabel],[x,y])}))
         
-        names = np.concatenate([np.repeat(name,x.shape[0]) for name,x in zip(names,xs, strict=True)])
-        df=pd.DataFrame(
-            {
-                "name":names,
-                plot.getAxis("bottom").label.toPlainText().strip(): np.concatenate(xs),
-                plot.getAxis("left").label.toPlainText().strip():np.concatenate(ys)
-            }
-        )
+        df = pd.concat(data,axis=1)
+        df.columns.set_names(("type","path","region","label","axis"), inplace=True)
         cls.add_attrs(df, kind)
         cls.store_dataframe(filename,df)
 

@@ -242,22 +242,21 @@ class FileLoader:
         """Read data exported from the OES toolbox, which will be either a csv file, or an Apache Parquet file.
         
         In case of csv file: this will be utf-8 encoded, comma-separated, starting with commented lines using '#'.
+
+        Plots will be exported with a pandas MultiIndex as column header.
+
+        This only supports reading spectra, i.e. exports of plots, not of tables with fitted data exported from the OES toolbox.
         """
         f = f if isinstance(f,Path) else Path(f)
         if f.suffix==".par":
             df  = pd.read_parquet(f)
         else:
-            df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', comment="#")
-        df[['file',"ROI", "label"]]=""
-        for n,g in df.groupby("name", sort=False):
-            parts = n.strip("file: ").strip().split(": ")
-            parts = [p.strip() for p in parts]
-            if len(parts)==1:
-                df.loc[g.index,"file"] = parts[0]
-            elif len(parts)==2:
-                df.loc[g.index, ["file","label"]]=parts
-            elif len(parts)==3:
-                df.loc[g.index,["file","ROI","label"]] = parts
+            with f.open("r") as fo:
+                if "plot export" in fo.readline():
+                    kwargs = {"header": [0,1,2,3,4],"index_col":0}
+                else:
+                    return 
+            df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', comment="#",**kwargs)
         return df
 
     @classmethod
@@ -271,22 +270,12 @@ class FileLoader:
         if ((b"OES toolbox" in sample) and (b"result" in sample)) or (sample.startswith(b"PAR1")):
             data = cls.read_oestoolbox_export(f)
             spectra = []
-            # Do not sort during groupby's to preserve order of spectra in file
-            # Else, 'spectrum 10' is sorted before 'spectrum 2', etc.
-            for n, g in data.groupby(["file","ROI"], sort=False):
-                name = ": ".join(n)
-                if g.label.nunique()<2:
-                    spectra.append(SpectraDataset(g['wavelength / nm'],g['intensity'],name=name))
-                else:
-                    by_label = g.groupby("label",sort=False)
-                    parts = []                    
-                    for i, (_,gg) in enumerate(by_label):
-                        if i==0:
-                            parts.append(gg["wavelength / nm"].reset_index(drop=True))
-                        parts.append(gg['intensity'].reset_index(drop=True))
-                    assert len(parts) == 1 + by_label.ngroups
-                    data = pd.concat(parts, axis=1)
-                    spectra.append(SpectraDataset(data.iloc[:,0],data.iloc[:,1:],name=name))
+            for n,g in data.T.groupby(["type","path","region"],sort=False):
+                # Group by unique starting wavelengths to cluster spectra with same axis.
+                for _nn,gg in g.iloc[::2,:].groupby(0, sort=False):
+                    x = gg.iloc[0,:].to_numpy()
+                    y = g.loc[[(*parts[:4],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
+                    spectra.append(SpectraDataset(x=x,y=y, name=": ".join(n).strip(": ")))
         elif b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
