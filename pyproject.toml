@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme","pynsist", "pip-tools"]
+requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme", "pip-tools"]
 build-backend = "hatchling.build"
 
 [project]
@@ -74,7 +74,7 @@ include = [
 
 [tool.hatch.envs.default]
 installer = "uv"
-extra-dependencies = ["ipykernel","ipython"]
+extra-dependencies = ["ipykernel","ipython","cx_Freeze>=7.5"]
 
 [tool.hatch.envs.hatch-test]
 parallel = false
@@ -105,8 +105,8 @@ executables = [
 ]
 
 [tool.cxfreeze.build_exe]
-packages = ["astropy", "scipy", "sqlalchemy", "owlspec"]
-includes = ["pyqtgraph"]
+packages = ["astropy", "scipy", "sqlalchemy", "owlspec", "spexread" ]
+includes = ["pyqtgraph", "Moose"]
 
 [tool.cxfreeze.bdist_msi]
 upgrade_code = "{03CE325A-E237-482B-9630-0B6584029808}"
