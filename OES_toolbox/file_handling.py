@@ -165,7 +165,6 @@ class FileLoader:
 
         However, contains a crude patch to retrieve the calibration for version 0.3.5 for some files
         """
-        # data = sif_parser.xr_open(f)
         data, meta = sif_parser.np_open(f)
         wl = sif_parser.utils.extract_calibration(meta)
         if (wl is None) or (np.shape(data)[-1]!=np.shape(wl)[-1]):
@@ -176,7 +175,6 @@ class FileLoader:
                         break
             wl = np.polyval(calib,np.arange(1,meta['ImageLength']+1))
 
-        # print(f"{np.shape(data)=} {np.shape(wl)=}, {meta['ImageLength']}")
         return wl,data
     
     @classmethod
@@ -248,15 +246,23 @@ class FileLoader:
         This only supports reading spectra, i.e. exports of plots, not of tables with fitted data exported from the OES toolbox.
         """
         f = f if isinstance(f,Path) else Path(f)
-        if f.suffix==".par":
+        if f.suffix.lower()==".par":
             df  = pd.read_parquet(f)
         else:
             with f.open("r") as fo:
                 if "plot export" in fo.readline():
-                    kwargs = {"header": [0,1,2,3,4],"index_col":0}
+                    kwargs = {"header": [2,3,4,5],"index_col":None}
                 else:
                     return 
-            df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', comment="#",**kwargs)
+            if f.suffix.lower()==".csv":
+                df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', **kwargs)
+            else:
+                df = pd.read_csv(f,sep='\t', decimal='.', encoding='utf-8', **kwargs)
+            cols = df.columns.to_frame()
+            for idx, col in enumerate(cols.columns):     
+                cols.iloc[(0, idx)] = cols.iloc[(0, idx)].lstrip("# ")
+            df.columns = pd.MultiIndex.from_frame(cols)
+            df.columns.set_names(("type","path","label","axis"), inplace=True)
         return df
 
     @classmethod
@@ -270,11 +276,12 @@ class FileLoader:
         if ((b"OES toolbox" in sample) and (b"result" in sample)) or (sample.startswith(b"PAR1")):
             data = cls.read_oestoolbox_export(f)
             spectra = []
-            for n,g in data.T.groupby(["type","path","region"],sort=False):
+            num = 4 if f.suffix.lower()==".par" else 3
+            for n,g in data.T.groupby(["type","path"],sort=False):
                 # Group by unique starting wavelengths to cluster spectra with same axis.
                 for _nn,gg in g.iloc[::2,:].groupby(0, sort=False):
                     x = gg.iloc[0,:].to_numpy()
-                    y = g.loc[[(*parts[:4],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
+                    y = g.loc[[(*parts[:num],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
                     spectra.append(SpectraDataset(x=x,y=y, name=": ".join(n).strip(": ")))
         elif b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
