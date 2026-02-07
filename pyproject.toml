@@ -13,7 +13,6 @@ authors = [
     { name = "Julian Held", email = "j.held@tue.nl" },
 ]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
@@ -73,9 +72,6 @@ include = [
     "/oes_toolbox",
 ]
 
-[tool.hatch.build.targets.custom]
-path = "build-exe.py"
-
 [tool.hatch.envs.default]
 installer = "uv"
 extra-dependencies = ["ipykernel","ipython"]
@@ -101,4 +97,29 @@ extend-select = ["E4", "E7", "E9", "F","C4", "SIM", "NPY", "PD","B","UP"]
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",
+]
+
+[tool.cxfreeze]
+executables = [
+    {script = "OES-toolbox.py", base = "gui", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
+]
+
+[tool.cxfreeze.build_exe]
+packages = ["astropy", "scipy", "sqlalchemy", "owlspec"]
+includes = ["pyqtgraph"]
+
+[tool.cxfreeze.bdist_msi]
+upgrade_code = "{03CE325A-E237-482B-9630-0B6584029808}"
+install_icon = "icon.png"
+
+[tool.cxfreeze.bdist_msi.data]
+Directory = [
+    ["ProgramMenuFolder", "TARGETDIR", "."],
+    ["MyProgramMenu", "ProgramMenuFolder", "MYPROG~1|My Program"]
+]
+ProgId = [
+    ["OES.toolbox", 0, 0, "Helping out with optical emission spectroscopy of low-temperature plasmas.", "OEStoolboxIcon", 0]
+]
+Icon = [
+    ["OEStoolboxIcon", "icon.ico"]
 ]
