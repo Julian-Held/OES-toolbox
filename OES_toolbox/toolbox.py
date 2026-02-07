@@ -116,6 +116,8 @@ class Window(QMainWindow):
         top_ax.setHeight(7)
         self.specplot.setAxisItems({"top": top_ax, "right":right_ax})
         self.specplot.addLegend()
+        self.specplot.getViewBox().scene().contextMenu[0].setVisible(False)
+
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
         self.action_export_plot_data.triggered.connect(lambda: FileExport.save_plot_data(self.specplot))
