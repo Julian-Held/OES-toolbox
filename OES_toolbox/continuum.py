@@ -4,8 +4,11 @@ import numpy as np
 from PyQt6.QtWidgets import  QFileDialog, QTreeWidgetItemIterator, \
                                 QTableWidgetItem, QMessageBox
 from PyQt6.QtCore import Qt
-
-from scipy import constants as const
+from OES_toolbox.lazy_import import lazy_import
+from OES_toolbox.exporters import FileExport
+# from scipy import constants as const
+const = lazy_import("scipy.constants")
+scipy = lazy_import("scipy")
 
 
 def black_body(x, T, A):
@@ -19,7 +22,6 @@ def black_body2(x, T, A, y0):
 class cont_module():
     def __init__(self, mainWindow):
         self.mw = mainWindow
-        self.io = self.mw.io
 
     def plot_continuum0(self):            
         for plot_item in self.mw.specplot.listDataItems():
@@ -77,29 +79,17 @@ class cont_module():
                 
                 
     def fit_filetree_item(self, this_item):
-        """ Loads file and plots content. Walks up the tree to assemble the path. """
-        path = []
-        current_parent = this_item.parent()
-        path.append(this_item.text(0))
-        while not current_parent is None:
-            path.append(current_parent.text(0))
-            current_item = current_parent
-            current_parent = current_item.parent()
-        path = os.path.join(self.io.active_folder, *path[::-1])
-        x,y = self.io.open_file(path, this_item)        
+        """Fit a black body spectrum to the data of an item."""
+        x,y = this_item.x,this_item.y  
         self.fit_cont_spec(x,y,this_item.text(0))
         
     
-    def fit_cont_spec(self,x,y,label):
-        from scipy.optimize import curve_fit
-        
+    def fit_cont_spec(self,x,y,label):      
         if self.mw.cont_minfilter_check.isChecked():
-            from scipy.ndimage import minimum_filter1d
-            y = minimum_filter1d(y, self.mw.cont_minfilter_num.value())
+            y = scipy.ndimage.minimum_filter1d(y, self.mw.cont_minfilter_num.value())
         
         if self.mw.cont_medfilter_check.isChecked():
-            from scipy.signal import medfilt
-            y = medfilt(y, self.mw.cont_medfilter_num.value())
+            y = scipy.signal.medfilt(y, self.mw.cont_medfilter_num.value())
     
         T0 = self.mw.cont_T0.value()
         y0 = black_body(x,T0,1)
@@ -112,14 +102,14 @@ class cont_module():
         
         if self.mw.cont_fit_y0_check.isChecked():
             p0 = (T0, A0, 0)
-            ans, err = curve_fit(black_body2, x, y, p0=p0)
+            ans, err = scipy.optimize.curve_fit(black_body2, x, y, p0=p0)
             y_fit = black_body2(x, *ans)
         else:
             p0 = (T0, A0)
-            ans, err = curve_fit(black_body, x, y, p0=p0)
+            ans, err = scipy.optimize.curve_fit(black_body, x, y, p0=p0)
             y_fit = black_body(x, *ans)
             
-        plot_label = 'fit T = ' + str(round(ans[0],3)) + ' for ' + label
+        plot_label = f"fit T = {ans[0]:.4g} for {label}"
         self.mw.plot(x, y_fit, 'cont.: ' + plot_label)
         self.mw.update_spec_colors()
         
@@ -153,43 +143,6 @@ class cont_module():
                 iterator += 1
                 if this_item.checkState(0) == Qt.CheckState.Checked:
                     self.fit_children(this_item)
-                    
-
-    def save_continuum_results(self):
-        seperator = "\t "
-        next_line = " \n"
-        filename = QFileDialog.getSaveFileName(caption='Save File',
-            filter='*.txt')
-
-        if filename[0]:
-
-            header = ("## OES toolbox result file: continuum emission ## \n" +
-                      "# " + str(datetime.datetime.now()) + "\n\n")
-                    
-            table_header = ("File" + seperator + "temperature / K" +  seperator + 
-                "intensity" + seperator + "vertical offset"+ "\n")
-
-            lines = [header, table_header]
-            for x in range(self.mw.cont_fit_results_table.rowCount()):
-                this_line = ""
-                for y in range(self.mw.cont_fit_results_table.columnCount()):
-                    this_line = this_line + str(self.mw.cont_fit_results_table.item(x,y).text()) + seperator
-                lines.append(this_line + next_line)
-
-            try:
-                f = open(filename[0], 'w', encoding="utf-8")
-                f.writelines(lines)
-            except:
-                 mb = QMessageBox()
-                 mb.setIcon(QMessageBox.Icon.Information)
-                 mb.setWindowTitle('Error')
-                 mb.setText('Could not save file.')
-                 mb.setStandardButtons(QMessageBox.StandardButton.Ok)
-                 mb.exec()
-
-
-
-
 
     def plot_cont_table_item(self, row_idx, plot):
         if plot:

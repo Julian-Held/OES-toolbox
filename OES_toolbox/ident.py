@@ -3,7 +3,11 @@ import datetime
 import numpy as np
 from PyQt6.QtWidgets import QFileDialog, QTableWidgetItem, QMessageBox
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
-from astropy.table import Table as aTable
+# from astropy.table import Table as aTable
+
+from OES_toolbox.lazy_import import lazy_import
+# aTable = lazy_import("astropy.table")
+owl = lazy_import("owlspec")
 
 file_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,12 +23,11 @@ class NISTloader(QObject):
     
     finished = pyqtSignal()
     result_ready = pyqtSignal(np.ndarray, np.ndarray, str)
-    data_ready = pyqtSignal(str, aTable)
+    data_ready = pyqtSignal(str,object) # Using object instead of astropy.table.Table saves import overhead
     progress = pyqtSignal(int)
     
     def run(self):
         self.progress.emit(1)
-        import owlspec as owl
         try:
             ele_spec = owl.spectrum(self.spec, wl_range=self.wl_range)
             nist_data = ele_spec.get_linedata()
@@ -44,7 +47,7 @@ class NISTloader(QObject):
         self.finished.emit()
 
 
-class ident_module():
+class ident_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
 
@@ -53,8 +56,6 @@ class ident_module():
         
     def update_spec_ident(self): 
         """ Loads NIST spectra and plots them. """
-        import owlspec as owl # type: ignore
-
         min_x = 0
         max_x = 1100
         max_y = 1
@@ -168,37 +169,3 @@ class ident_module():
         else: # LTE -> show Te input box
             self.mw.ident_Te.show()
             self.mw.ident_Te_label.show()
-            
-            
-    def save_NIST_data(self):
-        seperator = "\t "
-        next_line = " \n"
-        filename = QFileDialog.getSaveFileName(caption='Save File', filter='*.txt')
-
-        if filename[0]:
-
-            header = ("## OES toolbox result file: NIST data ## \n" +
-                        "# " + str(datetime.datetime.now()) + "\n\n")
-                    
-            table_header = ("Ion" + seperator + "wl / nm" +  seperator + 
-                "rel. intensity" + seperator + "Aik" + seperator + "Ek - Ei" + 
-                seperator + "lower configuration" + seperator + 
-                "upper configuration" + seperator +  "\n")
-
-            lines = [header, table_header]
-            for x in range(self.mw.ident_table.rowCount()):
-                this_line = ""
-                for y in range(self.mw.ident_table.columnCount()):
-                    this_line = this_line + str(self.mw.ident_table.item(x,y).text()) + seperator
-                lines.append(this_line + next_line)
-
-            try:
-                f = open(filename[0], 'w', encoding="utf-8")
-                f.writelines(lines)
-            except:
-                    mb = QMessageBox()
-                    mb.setIcon(QMessageBox.Icon.Information)
-                    mb.setWindowTitle('Error')
-                    mb.setText('Could not save file.')
-                    mb.setStandardButtons(QMessageBox.StandardButton.Ok)
-                    mb.exec()       
