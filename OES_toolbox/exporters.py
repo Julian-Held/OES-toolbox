@@ -17,6 +17,12 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt
 import pyqtgraph as pg
 
+from pyqtgraph import GraphicsScene
+from pyqtgraph.exporters.Matplotlib import MatplotlibExporter, MatplotlibWindow, _symbol_pg_to_mpl
+from pyqtgraph.exporters import Exporter, SVGExporter, ImageExporter
+from pyqtgraph.parametertree import Parameter,parameterTypes
+from pyqtgraph import PlotItem
+
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox._version import version
 pd = lazy_import("pandas")
@@ -202,3 +208,239 @@ class FileExport:
         cls.store_dataframe(filename, df)
 
 
+class PlotStyleParameters(parameterTypes.GroupParameter):
+    """Parameters for the customized Matplotlib Exporter.
+    
+    These parameters populate the export UI dialog with options to tweak the style used by matplotlib.
+    """
+    _selected_styles = []
+    def __init__(self,**opts):
+        styles = style.available
+        if 'default' not in styles:
+            styles.insert(0,"default")
+        styles = [s for s in styles if not s.startswith("_")]
+        if TOOLBOXSTYLE not in styles:
+            styles.insert(1,TOOLBOXSTYLE)
+        super().__init__(name="Export options",**opts)
+        self.addChildren(
+            [
+                {"name":"dpi","value":144,"type":"int","bounds":(30,2400)},
+                {"name":"layout engine","type":"list","limits":["constrained","tight","from style"]},
+                {"name":"legend", "type": "group","children":
+                    [
+                        {"name": "legend names","type":"list","limits":["full","short"]},
+                        {"name":"legend location","type":"list","limits":["best","upper left","upper right","lower left","lower right"]},
+                        {"name":"legend handle length","type":"float","value":0.5,"bounds":(0.1,2)},
+                    ]
+                },
+                {
+                    "name":"Matplotlib styles",
+                    "type":"group",
+                    "children":[
+                        Parameter.create(name=f"{name}",type="bool",value=name in PlotStyleParameters._selected_styles) for name in styles
+                    ]
+                }
+            ]
+        )
+
+
+    def active_styles(self):
+        """Figure out the styles that should be applied to the figure.
+        
+        Multiple styles can be applied, which may override eachother in certain parts.
+        """
+        selected = [child.name() for child in self.child("Matplotlib styles").children() if child.value() is True]
+        PlotStyleParameters._selected_styles = selected
+        return selected
+
+
+class OESMatplotlibExporter(MatplotlibExporter):
+    """A customized exporter for pyqtgraph to matplotlib.
+    
+    It overrides the default (pyqtraph) behaviour slightly to improve the representation.
+    
+    The user can now set multiple Matplotlib stylesheets to apply to the created plot, at runtime.
+
+    Also, the top and right axes are no longer removed, if they are shown in pyqtgraph as well, and enabled by the chosen stylesheets.
+
+    To aid in legend legibility, it is possible to shorten names, reduce the handle length and shorten names, if needed.
+    """
+    Name = "Matplotlib (OESToolbox)"
+
+    def __init__(self,item):
+        super().__init__(item)
+        self.params = PlotStyleParameters()
+
+    @staticmethod
+    def make_legend_name(full_name:str,shorten=False) -> str:
+        """Abbreviate names for use in the legend, if desired."""
+        if not shorten:
+            return full_name.strip()
+        elif "/" in full_name:
+            return full_name.rsplit("/",1)[1].strip()
+        else:
+            return full_name.rsplit(":",1)[1].strip()
+        
+
+    def get_pen_linestyle(self,pen):
+        match pen.style():
+            case Qt.PenStyle.SolidLine:
+                style = "-"
+            case Qt.PenStyle.DotLine:
+                style  = ":"
+            case Qt.PenStyle.DashLine:
+                style  = "--"
+            case Qt.PenStyle.DashDotLine:
+                style = "-."
+            case Qt.PenStyle.PenStyle.DashDotDotLine:
+                style = "dashdotdotted"
+            case Qt.PenStyle.NoPen:
+                style ="none"
+            case _:
+                style="-"
+        return {'ls':style,'color':pen.color().getRgbF(),'linewidth':pen.width()}
+    
+    def get_symbol_style(self,options):
+        """Translate pyqtgraph symbol styles to matplotlib compatible keyword arguments."""
+        symbolPen = pg.mkPen(options['symbolPen'])
+        symbolBrush = pg.mkBrush(options['symbolBrush'])
+        markeredgecolor = symbolPen.color().getRgbF()
+        markerfacecolor = symbolBrush.color().getRgbF()
+        markersize = options['symbolSize']
+        return {
+            "marker":_symbol_pg_to_mpl.get(options["symbol"], ""),
+            "mec":markeredgecolor,
+            "mfc": markerfacecolor,
+            "ms":markersize}
+
+
+    
+    def parameters(self)->PlotStyleParameters:
+        return self.params
+
+    def export(self, fileName=None):
+        if not isinstance(self.item,PlotItem):
+            QMessageBox.information(
+                None,
+                f"{self.item.__class__.__name__} not supported",
+                f"This exporter only support a `PlotItem`, not `{self.item.__class__.__name__}`.\n"
+                "Please select 'Plot' as the target of this export, not 'ViewBox' or 'Entire Scene'."
+            )
+            return
+        mpw = MatplotlibWindow()
+        MatplotlibExporter.windows.append(mpw)
+        abbreviate = self.params.child("legend")['legend names'].lower() == "short"
+        with style.context(self.params.active_styles(), after_reset=True):
+            fig = mpw.getFigure()
+            if self.params['layout engine'].lower()=="constrained":
+                fig.set_constrained_layout(True)
+            dpi=self.params['dpi']
+            if fig.dpi!=dpi:
+                w_px, h_px = fig.canvas.width(), fig.canvas.height()
+                fig.set_size_inches(w_px / dpi, h_px / dpi,forward=True)
+                fig.set_dpi(dpi)
+            xax = self.item.getAxis('bottom')
+            yax = self.item.getAxis('left')
+            ax_right = self.item.getAxis("right")
+            ax_top = self.item.getAxis("top")
+
+            # get labels from the graphic item
+            xlabel = xax.label.toPlainText()
+            ylabel = yax.label.toPlainText()
+            right_label = ax_right.label.toPlainText()
+            top_label = ax_top.label.toPlainText()
+            title = self.item.titleLabel.text
+
+            # if axes use autoSIPrefix, scale the data so mpl doesn't add its own
+            # scale factor label
+            xscale = yscale = right_scale=top_scale= 1.0
+            if xax.autoSIPrefix:
+                xscale = xax.autoSIPrefixScale
+            if yax.autoSIPrefix:
+                yscale = yax.autoSIPrefixScale
+            if ax_right.autoSIPrefix:
+                right_scale = ax_right.autoSIPrefixScale
+            if ax_right.autoSIPrefix:
+                top_scale = ax_top.autoSIPrefixScale
+
+            ax = fig.add_subplot(111, title=title)
+            ax.clear()
+            for item in self.item.curves:
+                if not item.isVisible():
+                    continue
+                x, y = item.getData()
+                item_label = self.make_legend_name(item.name(), abbreviate)
+                x = x * xscale
+                y = y * yscale
+
+                opts = item.opts
+                pen = pg.mkPen(opts['pen'])
+                line_style = self.get_pen_linestyle(pen)
+                marker_style = self.get_symbol_style(opts)
+                
+                if opts['fillLevel'] is not None and opts['fillBrush'] is not None:
+                    fillBrush = pg.mkBrush(opts['fillBrush'])
+                    fillcolor = fillBrush.color().getRgbF()
+                    ax.fill_between(x=x, y1=y, y2=opts['fillLevel'], facecolor=fillcolor)
+                
+                ax.plot(x, y, **line_style,**marker_style, label=item_label, zorder=item.zValue())
+
+                xr, yr = self.item.viewRange()
+                ax.set_xbound(xr[0]*xscale, xr[1]*xscale)
+                ax.set_ybound(yr[0]*yscale, yr[1]*yscale)
+                
+
+            ax.set_xlabel(xlabel)  # place the labels.
+            ax.set_ylabel(ylabel)
+            # Don't force ticks (by line below), but let this be controlled by the selected style(s).
+            # ax.tick_params(axis='both', which='both',direction='in',bottom=True, top=True,left=True,right=True, labelleft=True,labelbottom=True, labelright=False,labeltop=False)
+            if self.item.legend.isVisible() and (len(self.item.legend.items)>0):
+                ax.legend(loc=self.params.child("legend")["legend location"], handlelength=self.params.child("legend")["legend handle length"])
+            if self.params['layout engine'].lower()=="tight":
+                fig.tight_layout()
+            mpw.draw()
+
+class OESDataExporter(Exporter):
+    """An exporter that exports graphed data from the OES-toolbox to a file (text, excel, parquet).
+    
+    This exporter is intended to be used instead of the default pyqtgraph CSVExporter/HDF5Exporter, to be consistent with other methods to export in the OES-toolbox.
+
+    In essence, it triggers the appropriate export action from the main toolbox window, depending on the user selection.
+
+    In case of using a `Plot data` export, the resulting file can be read/plotted again with the OES-toolbox as a set of spectra.
+    """
+    Name = "Export data (OES-toolbox)"
+    
+    def __init__(self,item:PlotItem|GraphicsScene):
+        super().__init__(item)
+        self.params = Parameter.create(name='params', type='group', children=[
+            {"name":"Export data","type":"list","limits":["Plot data","NIST table","Molecule fit results","Continuum results"]},
+        ])
+        self.main_window = item.getViewWidget().window()
+
+
+    def export(self):
+        """Export requested data by calling the appropriate export action on the toolbox main window."""
+        kind = self.params.child("Export data").value()
+        match kind:
+            case "Plot data":
+                self.main_window.action_export_plot_data.trigger()
+            case _s if "NIST" in _s:
+                self.main_window.action_export_ident_table.trigger()
+            case _s if "Molecule" in _s:
+                self.main_window.action_export_molecule_fit_results.trigger()
+            case _s if "Continuum" in _s:
+                self.main_window.action_export_continuum_fit_results.trigger()
+            case _:
+                QMessageBox.warning(self.main_window, "Failed to export file",f"Could perform requested export: {kind}")
+
+    def parameters(self):
+        return self.params
+    
+# Clear the default exports, then register the ones we want to expose in order of priority.
+# SVG/ImageExporter may still be usefull for users.
+pg.exporters.Exporter.Exporters.clear()
+OESMatplotlibExporter.register()
+OESDataExporter.register()
+SVGExporter.register()
+ImageExporter.register()
