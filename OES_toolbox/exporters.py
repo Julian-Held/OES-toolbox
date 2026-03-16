@@ -37,11 +37,14 @@ class FileExport:
     @classmethod
     def get_save_path(cls)-> None|Path:
         """Get a file path for saving a file."""
-        filename,_ = QFileDialog.getSaveFileName(caption='Save File', 
-                                                 filter="""Text file (tab-separated)(*.txt);;
-                                                 Text file (comma-separated)(*.csv);;
-                                                 Microsoft Excel (*.xlsx);;Apache Parquet (*.par)
-                                                 """, directory=cls.lastFolder)
+        filename,_ = QFileDialog.getSaveFileName(
+            caption="Save File", 
+            filter="""Text file (tab-separated)(*.txt);;
+            Text file (comma-separated)(*.csv);;
+            Microsoft Excel (*.xlsx);;Apache Parquet (*.par)
+            """, 
+            directory=cls.lastFolder
+        )
         if filename=="":
             return
         filename = Path(filename)
@@ -113,11 +116,21 @@ class FileExport:
     
     @classmethod
     def graph_to_matplotlib(cls, graph) -> Figure:
+        styles = plt.style.available
+        if TOOLBOXSTYLE not in styles:
+            styles.insert(0,TOOLBOXSTYLE)
+        if 'default' not in styles:
+            styles.insert(0,'default')
+        pre_select = 1 if FileExport.pickedLast is None else styles.index(FileExport.pickedLast)
+        picked,ok = QInputDialog.getItem(None,"Pick plot style","Pick the matplotlib stylesheets to apply",styles,pre_select,False)
+        cls.pickedLast = picked
         plt.style.use('default') # Make sure to clear/reset styling to default for predictable results.
-        plt.style.use(TOOLBOXSTYLE)
+        plt.style.use(picked)
         xlim,ylim = graph.getViewBox().viewRange()
         fig = plt.figure(dpi=300)
         for plot_item in graph.listDataItems():
+            if not plot_item.isVisible():
+                continue
             pen = plot_item.opts['pen']            
             style_kws = {
                 "c":pen.color().name(), 
