@@ -16,6 +16,7 @@ from PyQt6 import QtCore
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph as pg
+from pyqtgraph.GraphicsScene.exportDialog import ExportDialog
 import webbrowser
 import qtawesome as qta
 
@@ -235,7 +236,11 @@ class Window(QMainWindow):
         self.check_HideLegend.checkStateChanged.connect(
             lambda state: self.specplot.plotItem.legend.setVisible(state == Qt.CheckState.Checked)
         )
-
+        # customize the export dialog to display options better
+        export_dialog = ExportDialog(self.specplot.scene())
+        self.specplot.scene().exportDialog = export_dialog
+        export_dialog.setMinimumSize(300,550)
+        
 
 ##############################################################################
 # <-------------------- basic/general UI function -------------------------> #
