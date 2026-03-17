@@ -28,6 +28,11 @@ from OES_toolbox._version import version
 pd = lazy_import("pandas")
 
 TOOLBOXSTYLE = "OES_toolbox.ui.jh-paper"
+STYLES = [s for s in style.available if not s.startswith("_")]
+if 'default' not in STYLES:
+    STYLES.insert(0,'default')
+if TOOLBOXSTYLE not in STYLES:
+    STYLES.insert(1,TOOLBOXSTYLE)
 
 class FileExport:
     """Class with methods for exporting data and/or plots to various file types."""
@@ -116,13 +121,8 @@ class FileExport:
     
     @classmethod
     def graph_to_matplotlib(cls, graph) -> Figure:
-        styles = plt.style.available
-        if TOOLBOXSTYLE not in styles:
-            styles.insert(0,TOOLBOXSTYLE)
-        if 'default' not in styles:
-            styles.insert(0,'default')
-        pre_select = 1 if FileExport.pickedLast is None else styles.index(FileExport.pickedLast)
-        picked,ok = QInputDialog.getItem(None,"Pick plot style","Pick the matplotlib stylesheets to apply",styles,pre_select,False)
+        pre_select = 1 if FileExport.pickedLast is None else STYLES.index(FileExport.pickedLast)
+        picked,ok = QInputDialog.getItem(None,"Pick plot style","Pick the matplotlib stylesheets to apply", STYLES, pre_select, False)
         cls.pickedLast = picked
         plt.style.use('default') # Make sure to clear/reset styling to default for predictable results.
         plt.style.use(picked)
@@ -228,12 +228,6 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
     """
     _selected_styles = []
     def __init__(self,**opts):
-        styles = style.available
-        if 'default' not in styles:
-            styles.insert(0,"default")
-        styles = [s for s in styles if not s.startswith("_")]
-        if TOOLBOXSTYLE not in styles:
-            styles.insert(1,TOOLBOXSTYLE)
         super().__init__(name="Export options",**opts)
         self.addChildren(
             [
@@ -250,20 +244,34 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
                     "name":"Matplotlib styles",
                     "type":"group",
                     "children":[
-                        Parameter.create(name=f"{name}",type="bool",value=name in PlotStyleParameters._selected_styles) for name in styles
+                        Parameter.create(name=f"{name}",type="bool",value=name in self._selected_styles) for name in STYLES
                     ]
                 }
             ]
         )
+        for child in self.child("Matplotlib styles").children():
+            child.sigValueChanged.connect(self.toggle_active_style)
 
+    def toggle_active_style(self,sender:Parameter):
+        """Update the list of active styles in order to persist user selection, upon toggle of a specific style."""
+        name:str = sender.name()
+        is_active:bool = sender.value()
+        if is_active and name not in self._selected_styles:
+            self._selected_styles.append(name)
+        elif not is_active and name in self._selected_styles:
+            self._selected_styles.remove(name)
 
     def active_styles(self):
         """Figure out the styles that should be applied to the figure.
         
-        Multiple styles can be applied, which may override eachother in certain parts.
+        Multiple styles can be applied, which may override each other in certain parts, and which depends on ordering.
+
+        This method updates the `_selected_styles` class attribute and always returns styles in the same order as the parameters.
+
+        This ensured a deterministic application of styles, regardless of the order in which they were selected.
         """
         selected = [child.name() for child in self.child("Matplotlib styles").children() if child.value() is True]
-        PlotStyleParameters._selected_styles = selected
+        self._selected_styles = selected
         return selected
 
 
@@ -296,6 +304,7 @@ class OESMatplotlibExporter(MatplotlibExporter):
         
 
     def get_pen_linestyle(self,pen):
+        """Map Qt pen styles to matplotlib compatible keyword arguments."""
         match pen.style():
             case Qt.PenStyle.SolidLine:
                 style = "-"
