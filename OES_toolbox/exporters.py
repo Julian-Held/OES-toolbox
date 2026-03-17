@@ -227,6 +227,7 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
     These parameters populate the export UI dialog with options to tweak the style used by matplotlib.
     """
     _selected_styles = []
+    _state = None
     def __init__(self,**opts):
         super().__init__(name="Export options",**opts)
         self.addChildren(
@@ -249,6 +250,9 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
                 }
             ]
         )
+        if self.__class__._state is not None:
+            self.restoreState(self._state)
+        self.sigTreeStateChanged.connect(lambda _: setattr(self.__class__, "_state", self.saveState()))
         for child in self.child("Matplotlib styles").children():
             child.sigValueChanged.connect(self.toggle_active_style)
 
@@ -334,8 +338,6 @@ class OESMatplotlibExporter(MatplotlibExporter):
             "mec":markeredgecolor,
             "mfc": markerfacecolor,
             "ms":markersize}
-
-
     
     def parameters(self)->PlotStyleParameters:
         return self.params
@@ -432,6 +434,7 @@ class OESDataExporter(Exporter):
     In case of using a `Plot data` export, the resulting file can be read/plotted again with the OES-toolbox as a set of spectra.
     """
     Name = "Export data (OES-toolbox)"
+    _state = None
     
     def __init__(self,item:PlotItem|GraphicsScene):
         super().__init__(item)
@@ -439,6 +442,11 @@ class OESDataExporter(Exporter):
             {"name":"Export data","type":"list","limits":["Plot data","NIST table","Molecule fit results","Continuum results"]},
         ])
         self.main_window = item.getViewWidget().window()
+        if self.__class__._state is not None:
+            self.params.restoreState(self.__class__._state)
+
+        
+        self.params.child("Export data").sigValueChanged.connect(lambda _:setattr(self.__class__,"_state",self.params.saveState()))
 
 
     def export(self):
