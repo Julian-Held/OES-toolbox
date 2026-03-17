@@ -93,23 +93,18 @@ class FileExport:
                         sheet.set_column_pixels(0, 0, 170)
                     return
             header = (
-                f"## OES toolbox ({version}) result file: {data.attrs['Result file']} \n"
+                f"## OES toolbox ({version}) result file: {data.attrs['Result file']}\n"
                 f"# Exported on {data.attrs['Exported on']}\n"
             )
             if isinstance(data.columns, pd.MultiIndex):
                 # use a space (`\s`) instead of empty string for text export to avoid `Unnamed columns`
                 cols = data.columns.to_frame()
-                cols = cols[cols.columns.drop("region")] # not used?!
-                for idx, col in enumerate(cols.columns):                        
+                for col in cols.columns:
                     cols[col] = cols[col].replace(""," ")
-                    cols.iloc[(0, idx)] = "# " + cols.iloc[(0, idx)] # comment symbol to header lines
-
                 data.columns = pd.MultiIndex.from_frame(cols)
-    
             data_fmt = {"sep":",","decimal":"."} if path.suffix.lower()==".csv" else {"sep":"\t","decimal":"."} 
-            path.write_text(header,encoding="utf-8")
-            data.to_csv(path,**data_fmt, encoding="utf-8", mode="a", index=False)
-
+            path.write_text(header,encoding='utf-8')
+            data.to_csv(path,**data_fmt, encoding="utf-8", mode="a", index=isinstance(data.columns, pd.MultiIndex))
         except Exception as e:
             QMessageBox.warning(
                 None,

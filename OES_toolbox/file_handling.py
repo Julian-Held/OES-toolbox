@@ -251,18 +251,11 @@ class FileLoader:
         else:
             with f.open("r") as fo:
                 if "plot export" in fo.readline():
-                    kwargs = {"header": [2,3,4,5],"index_col":None}
+                    kwargs = {"header": [0,1,2,3,4],"index_col":0}
                 else:
                     return 
-            if f.suffix.lower()==".csv":
-                df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', **kwargs)
-            else:
-                df = pd.read_csv(f,sep='\t', decimal='.', encoding='utf-8', **kwargs)
-            cols = df.columns.to_frame()
-            for idx, col in enumerate(cols.columns):     
-                cols.iloc[(0, idx)] = cols.iloc[(0, idx)].lstrip("# ")
-            df.columns = pd.MultiIndex.from_frame(cols)
-            df.columns.set_names(("type","path","label","axis"), inplace=True)
+            data_fmt = {"sep":"," if f.suffix.lower()==".csv" else "\t","decimal":"."}
+            df = pd.read_csv(f,**data_fmt, encoding='utf-8', comment="#",**kwargs)
         return df
 
     @classmethod
@@ -276,12 +269,11 @@ class FileLoader:
         if ((b"OES toolbox" in sample) and (b"result" in sample)) or (sample.startswith(b"PAR1")):
             data = cls.read_oestoolbox_export(f)
             spectra = []
-            num = 4 if f.suffix.lower()==".par" else 3
-            for n,g in data.T.groupby(["type","path"],sort=False):
+            for n,g in data.T.groupby(["type","path","region"],sort=False):
                 # Group by unique starting wavelengths to cluster spectra with same axis.
                 for _nn,gg in g.iloc[::2,:].groupby(0, sort=False):
                     x = gg.iloc[0,:].to_numpy()
-                    y = g.loc[[(*parts[:num],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
+                    y = g.loc[[(*parts[:4],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
                     spectra.append(SpectraDataset(x=x,y=y, name=": ".join(n).strip(": ")))
         elif b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
