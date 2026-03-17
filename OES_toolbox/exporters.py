@@ -187,7 +187,8 @@ class FileExport:
             part_names = [part.strip() for part in plot_item.name().split(": ")]
             match len(part_names):
                 case 2:
-                    part_names.extend([""] * 2)
+                    # Edge case: must set a 'spectrum name' to be able to reliably open the file again using pandas MultiIndex.
+                    part_names.extend(["", "spectrum 0"])
                 case 3:
                     part_names.insert(2, "")
             data.append(pd.DataFrame({(*part_names,label):values for label, values in zip([xlabel,ylabel],[x,y])}))
