@@ -41,13 +41,16 @@ class FileExport:
 
     @classmethod
     def get_save_path(cls)-> None|Path:
-        """Get a file path for saving a file."""
+        """Get a file path for saving a file.
+        
+        If no extension is specified, defaults to ".txt".
+        """
         filename,_ = QFileDialog.getSaveFileName(
             caption="Save File", 
-            filter="""Text file (tab-separated)(*.txt);;
-            Text file (comma-separated)(*.csv);;
-            Microsoft Excel (*.xlsx);;Apache Parquet (*.par)
-            """, 
+            filter=(
+                "Text file (tab- or comma-separated)(*.txt *.csv);;"
+                "Microsoft Excel (*.xlsx);;Apache Parquet (*.par)"
+            ), 
             directory=cls.lastFolder
         )
         if filename=="":
@@ -102,14 +105,10 @@ class FileExport:
                     cols.iloc[(0, idx)] = "# " + cols.iloc[(0, idx)] # comment symbol to header lines
 
                 data.columns = pd.MultiIndex.from_frame(cols)
-
-            if path.suffix.lower()==".csv":
-                path.write_text(header,encoding='utf-8')
-                data.to_csv(path,sep=",", decimal=".", encoding="utf-8", mode="a", index=False)
-            
-            else: # e.g. .txt
-                path.write_text(header,encoding='utf-8')
-                data.to_csv(path,sep='\t', decimal=".", encoding="utf-8", mode="a", index=False)
+    
+            data_fmt = {"sep":",","decimal":"."} if path.suffix.lower()==".csv" else {"sep":"\t","decimal":"."} 
+            path.write_text(header,encoding="utf-8")
+            data.to_csv(path,**data_fmt, encoding="utf-8", mode="a", index=False)
 
         except Exception as e:
             QMessageBox.warning(
