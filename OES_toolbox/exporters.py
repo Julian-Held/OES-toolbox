@@ -124,43 +124,42 @@ class FileExport:
         pre_select = 1 if FileExport.pickedLast is None else STYLES.index(FileExport.pickedLast)
         picked,ok = QInputDialog.getItem(None,"Pick plot style","Pick the matplotlib stylesheets to apply", STYLES, pre_select, False)
         cls.pickedLast = picked
-        plt.style.use('default') # Make sure to clear/reset styling to default for predictable results.
-        plt.style.use(picked)
-        xlim,ylim = graph.getViewBox().viewRange()
-        fig = plt.figure(dpi=300)
-        for plot_item in graph.listDataItems():
-            if not plot_item.isVisible():
-                continue
-            pen = plot_item.opts['pen']            
-            style_kws = {
-                "c":pen.color().name(), 
-                "zorder":plot_item.zValue(),
-                "label": plot_item.name(),
-                "lw": pen.width(),
-            }
-            match pen.style().name.lower():
-                case "solidline":
-                    style_kws['ls'] = "-"
-                case "dotline":
-                    style_kws['ls'] = ":"
-                case 'dashline':
-                    style_kws['ls'] = "--"
-                case "nopen":
-                    style_kws['ls']=''
-            if plot_item.name().startswith("file"):
-                style_kws["label"]=plot_item.name().strip("file:").strip()
-            if plot_item.name().startswith("cont"):
-                style_kws["lw"] = 1
-            elif plot_item.name().startswith('NIST'):
-                style_kws["lw"] = 0.5
-            x,y = plot_item.getData()
-            plt.plot(x,y,**style_kws)
-        plt.xlim(xlim)
-        plt.ylim(ylim)
-        if graph.plotItem.legend.isVisible() and (len(graph.plotItem.legend.items)>0):
-            plt.legend()
-        plt.xlabel(graph.getAxis("bottom").label.toPlainText())
-        plt.ylabel(graph.getAxis("left").label.toPlainText())
+        with plt.style.context(picked,after_reset=True):
+            xlim,ylim = graph.getViewBox().viewRange()
+            fig = plt.figure(dpi=300)
+            for plot_item in graph.listDataItems():
+                if not plot_item.isVisible():
+                    continue
+                pen = plot_item.opts['pen']            
+                style_kws = {
+                    "c":pen.color().name(), 
+                    "zorder":plot_item.zValue(),
+                    "label": plot_item.name(),
+                    "lw": pen.width(),
+                }
+                match pen.style().name.lower():
+                    case "solidline":
+                        style_kws['ls'] = "-"
+                    case "dotline":
+                        style_kws['ls'] = ":"
+                    case 'dashline':
+                        style_kws['ls'] = "--"
+                    case "nopen":
+                        style_kws['ls']=''
+                if plot_item.name().startswith("file"):
+                    style_kws["label"]=plot_item.name().strip("file:").strip()
+                if plot_item.name().startswith("cont"):
+                    style_kws["lw"] = 1
+                elif plot_item.name().startswith('NIST'):
+                    style_kws["lw"] = 0.5
+                x,y = plot_item.getData()
+                plt.plot(x,y,**style_kws)
+            plt.xlim(xlim)
+            plt.ylim(ylim)
+            if graph.plotItem.legend.isVisible() and (len(graph.plotItem.legend.items)>0):
+                plt.legend()
+            plt.xlabel(graph.getAxis("bottom").label.toPlainText())
+            plt.ylabel(graph.getAxis("left").label.toPlainText())
         return fig
     
     @staticmethod
