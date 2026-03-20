@@ -54,14 +54,15 @@ class FileExport:
 
         When the user cancels the dialog, returns (None,None).
         """
+        supported = (
+                "Text file (tab-separated)(*.txt *.*);;"
+                "Text file (comma-separated)(*.csv *.*);;"
+                "Apache Parquet (*.par)"
+        )
         filename,filter = QFileDialog.getSaveFileName(
             parent=None,
             caption="Save File" if caption is None else caption, 
-            filter=(
-                "Text file (tab-separated)(*.txt *.*);;"
-                "Text file (comma-separated)(*.csv *.*);;"
-                "Microsoft Excel (*.xlsx);;Apache Parquet (*.par)"
-            ), 
+            filter= supported + ";;Microsoft Excel (*.xlsx)" if "export" in caption.lower() else supported, 
             directory=cls.lastFolder
         )
         if filename=="":
@@ -480,13 +481,15 @@ class OESDataExporter(Exporter):
 
         for child in self.params:
             child.sigValueChanged.connect(lambda _:setattr(self.__class__,"_state",self.params.saveState()))
-        self.params.child("Export data").sigValueChanged.connect(lambda x: self.params.child("Save").setValue(x.value()=="Plot data"))
         self.params.child("Export data").sigValueChanged.connect(lambda x: self.params.child("Save").setWritable(x.value()=="Plot data"))
         
 
 
     def export(self):
-        """Export requested data by calling the appropriate export action on the toolbox main window."""
+        """Export requested data by calling the appropriate export action on the toolbox main window.
+        
+        The "Save" parameter only has an effect when dealing with to "Plot data", in other cases it has no meaning.
+        """
         kind = self.params.child("Export data").value()
         is_save = self.params.child("Save").value()
         match kind:
