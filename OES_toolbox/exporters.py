@@ -40,24 +40,36 @@ class FileExport:
     lastFolder = None
 
     @classmethod
-    def get_save_path(cls)-> None|Path:
+    def get_save_path(cls, caption=None)-> tuple[Path,dict[str,str]]|tuple[None,None]:
         """Get a file path for saving a file.
         
         If no extension is specified, defaults to ".txt".
+
+        Returns a tuple of (`filename`,`txt_fmt`), where `filename` specifies the target file path.
+        
+        The `txt_fmt` is a dict that specifies the separator and delimiter to use for text files.
+        
+        I.e. tab vs comma separated, both with decimal point.)
+
+
+        When the user cancels the dialog, returns (None,None).
         """
-        filename,_ = QFileDialog.getSaveFileName(
-            caption="Save File", 
+        filename,filter = QFileDialog.getSaveFileName(
+            parent=None,
+            caption="Save File" if caption is None else caption, 
             filter=(
-                "Text file (tab- or comma-separated)(*.txt *.csv);;"
+                "Text file (tab-separated)(*.txt *.*);;"
+                "Text file (comma-separated)(*.csv *.*);;"
                 "Microsoft Excel (*.xlsx);;Apache Parquet (*.par)"
             ), 
             directory=cls.lastFolder
         )
         if filename=="":
-            return
+            return None, None # Handle cancelation without throwing exceptions
+        txt_fmt = {"sep": "," if "comma" in filter else "\t", "decimal":"."}
         filename = Path(filename)
-        cls.lastFolder = filename.parent.as_posix()
-        return filename 
+        cls.lastFolder: str = filename.parent.as_posix()
+        return filename, txt_fmt
 
     @staticmethod
     def add_attrs(df:pd.DataFrame, kind:str):
@@ -68,7 +80,13 @@ class FileExport:
         }
     
     @classmethod
-    def store_dataframe(cls,path:Path,data:pd.DataFrame):
+    def store_dataframe(cls,path:Path,data:pd.DataFrame, txt_fmt:dict|None=None):
+        """Store the provided dataframe to the specified location, deciding the file type from the extension.
+        
+        The optional kwarg `txt_fmt` is used to control the how data is saved to a text file.
+        
+        If `txt_fmt=None` is provided, falls back to: `{"sep":"\t","decimal":"."}`
+        """
         try:
             if path.suffix.lower()==".par":
                 data.to_parquet(path)
@@ -96,15 +114,10 @@ class FileExport:
                 f"## OES toolbox ({version}) result file: {data.attrs['Result file']}\n"
                 f"# Exported on {data.attrs['Exported on']}\n"
             )
-            if isinstance(data.columns, pd.MultiIndex):
-                # use a space (`\s`) instead of empty string for text export to avoid `Unnamed columns`
-                cols = data.columns.to_frame()
-                for col in cols.columns:
-                    cols[col] = cols[col].replace(""," ")
-                data.columns = pd.MultiIndex.from_frame(cols)
-            data_fmt = {"sep":",","decimal":"."} if path.suffix.lower()==".csv" else {"sep":"\t","decimal":"."} 
+            txt_fmt = {"sep":"\t","decimal":"."} if txt_fmt is None else txt_fmt
             path.write_text(header,encoding='utf-8')
-            data.to_csv(path,**data_fmt, encoding="utf-8", mode="a", index=isinstance(data.columns, pd.MultiIndex))
+            # If columns are MultiIndex, we are dealing with a "Save" operation, else an "Export" to text.
+            data.to_csv(path,**txt_fmt, encoding="utf-8", mode="a", index=isinstance(data.columns, pd.MultiIndex))
         except Exception as e:
             QMessageBox.warning(
                 None,
@@ -169,34 +182,59 @@ class FileExport:
         return img
     
     @classmethod
-    def save_plot_data(cls, plot,kind:str="plot export"):
-        filename = cls.get_save_path()
+    def save_plot_data(cls, plot,kind:str="plot export", export=True):
+        """"Save or export the plotted data.
+        
+        In case `export = True` the operation is considered an "Export".
+        
+        For an "Export" to a text file (e.g. tsv, csv), we make no guarantee that it can be read again by OESToolbox.
+
+        This is because the MultiIndex is flattened, for easier handling of the export in external programs (Origin, Excel, Matlab).
+
+        If the features from the pandas MultiIndex need to be preserved in a text file, the `export` arg must be set to False.
+
+        In the case that `export = False` the operation is considered a "Save", and the resulting file MUST be readable by OESToolbox again.
+        
+        It may however not result in  exactly the same tree structure (mainly for files with multiple ROIs).
+
+        For other supported format, there is no different behaviour between "Exports" (export=True), or "Saves" (export=False).
+        """
+        filename,txt_fmt = cls.get_save_path(f"{'Export' if export else 'Save'} plotted data")
         if filename is None:
             return
         xlabel = plot.getAxis("bottom").label.toPlainText().strip()
         ylabel = plot.getAxis("left").label.toPlainText().strip()
         data = []
+        # export without MultiIndex for simple use in external programs (Origin, Excel, etc.)
+        flatten = export and filename.suffix.lower() in ['.txt',".csv"]
         for plot_item in plot.listDataItems():
             x,y = plot_item.getData()
-            part_names = [part.strip() for part in plot_item.name().split(": ")]
+            plot_name = plot_item.name()
+            if flatten:
+                data.append(pd.DataFrame({f"{plot_name}: {label}".strip():values for label,values in zip([xlabel,ylabel],[x,y])}))
+                continue
+            part_names = [part.strip() for part in plot_name.split(": ")]
             match len(part_names):
+                # Using " " (note the \s) is needed for preserving MultiIndex in text files, without adding many 'Unnamed...' columns
+                # By doing this generically, a test of `pandas.testing.assert_frame_equal(df_text, df_parquet)` passes.
+                # Else it fails on the index, while a `numpy.testing.assert_allclose` passes.). 
                 case 2:
-                    # Edge case: must set a 'spectrum name' to be able to reliably open the file again using pandas MultiIndex.
-                    part_names.extend(["", "spectrum 0"])
+                    part_names.extend([" "]*2)
                 case 3:
-                    part_names.insert(2, "")
+                    part_names.insert(2, " ")
             data.append(pd.DataFrame({(*part_names,label):values for label, values in zip([xlabel,ylabel],[x,y])}))
         
         df = pd.concat(data,axis=1)
-        df.columns.set_names(("type","path","region","label","axis"), inplace=True)
+        if not flatten:
+            df.columns.set_names(("type","path","region","label","axis"), inplace=True)
         cls.add_attrs(df, kind)
-        cls.store_dataframe(filename,df)
+        cls.store_dataframe(filename,df, txt_fmt = txt_fmt)
 
 
     @classmethod
     def save_table(cls,table:"QTableWidget"):
         action_name = table.sender().text()
-        filename = cls.get_save_path()
+        filename, txt_fmt = cls.get_save_path(caption=f"Export {action_name}")
         if filename is None:
             return
         if "NIST" in action_name:
@@ -212,7 +250,7 @@ class FileExport:
         df = pd.DataFrame(data)
         df = df.convert_dtypes()
         cls.add_attrs(df, kind=kind)
-        cls.store_dataframe(filename, df)
+        cls.store_dataframe(filename, df, txt_fmt=txt_fmt)
 
 
 class PlotStyleParameters(parameterTypes.GroupParameter):
@@ -432,23 +470,33 @@ class OESDataExporter(Exporter):
     
     def __init__(self,item:PlotItem|GraphicsScene):
         super().__init__(item)
-        self.params = Parameter.create(name='params', type='group', children=[
+        self.params = Parameter.create(name='File export/save options', type='group', children=[
             {"name":"Export data","type":"list","limits":["Plot data","NIST table","Molecule fit results","Continuum results"]},
+            {"name": "Save","type":"bool","value":True,"title":"Save (preserve read support)"}
         ])
         self.main_window = item.getViewWidget().window()
         if self.__class__._state is not None:
             self.params.restoreState(self.__class__._state)
 
+        for child in self.params:
+            child.sigValueChanged.connect(lambda _:setattr(self.__class__,"_state",self.params.saveState()))
+        self.params.child("Export data").sigValueChanged.connect(lambda x: self.params.child("Save").setValue(x.value()=="Plot data"))
+        self.params.child("Export data").sigValueChanged.connect(lambda x: self.params.child("Save").setWritable(x.value()=="Plot data"))
         
-        self.params.child("Export data").sigValueChanged.connect(lambda _:setattr(self.__class__,"_state",self.params.saveState()))
 
 
     def export(self):
         """Export requested data by calling the appropriate export action on the toolbox main window."""
         kind = self.params.child("Export data").value()
+        is_save = self.params.child("Save").value()
         match kind:
             case "Plot data":
-                self.main_window.action_export_plot_data.trigger()
+                if is_save:
+                    # For a text file: the file should be readable/importable again
+                    self.main_window.action_save_data.trigger()
+                else:
+                    # For a text file: file may not be opened again
+                    self.main_window.action_export_plot_data.trigger()
             case _s if "NIST" in _s:
                 self.main_window.action_export_ident_table.trigger()
             case _s if "Molecule" in _s:

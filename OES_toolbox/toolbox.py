@@ -124,6 +124,7 @@ class Window(QMainWindow):
         self.actionRefresh_plots.triggered.connect(self.update_spec)
         self.proxy = pg.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
         self.actionClear_Plots.triggered.connect(self.clear_all_spec)
+        self.action_save_data.triggered.connect(lambda: FileExport.save_plot_data(self.specplot,export=False))
     
         # file loading, plotting /drag & drop
         self.button_open.clicked.connect(self.actionOpenFolder.trigger)
