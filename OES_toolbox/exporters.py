@@ -220,7 +220,7 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
     
     These parameters populate the export UI dialog with options to tweak the style used by matplotlib.
     """
-    _selected_styles = []
+    _selected_styles = [TOOLBOXSTYLE]
     _state = None
     def __init__(self,**opts):
         super().__init__(name="Export options",**opts)
