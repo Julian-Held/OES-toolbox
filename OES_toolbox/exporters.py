@@ -25,6 +25,7 @@ from pyqtgraph import PlotItem
 
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox._version import version
+from OES_toolbox.file_handling import COLUMN_LEVEL_NAMES
 pd = lazy_import("pandas")
 
 TOOLBOXSTYLE = "OES_toolbox.ui.jh-paper"
@@ -209,6 +210,7 @@ class FileExport:
         # export without MultiIndex for simple use in external programs (Origin, Excel, etc.)
         flatten = export and filename.suffix.lower() in ['.txt',".csv"]
         for plot_item in plot.listDataItems():
+            # TODO: consider exporting data from tree-item associated with a plot; may make constructing a name or multiindex simpler.
             x,y = plot_item.getData()
             plot_name = plot_item.name()
             if flatten:
@@ -216,18 +218,25 @@ class FileExport:
                 continue
             part_names = [part.strip() for part in plot_name.split(": ")]
             match len(part_names):
+                case n if n<2:
+                    raise ValueError(f"Case not supported: {len(part_names)=}<2: {part_names}")
                 # Using " " (note the \s) is needed for preserving MultiIndex in text files, without adding many 'Unnamed...' columns
                 # By doing this generically, a test of `pandas.testing.assert_frame_equal(df_text, df_parquet)` passes.
                 # Else it fails on the index, while a `numpy.testing.assert_allclose` passes.). 
                 case 2:
-                    part_names.extend([" "]*2)
+                    part_names.extend([" "] * 2)
                 case 3:
                     part_names.insert(2, " ")
+                case 4:
+                    pass
+                case _:
+                    # Perhaps could be made more fancy than taking the last 4 elements; figuring this out may be easier with the tree item instead of the plot.
+                    part_names=part_names[-4:]
             data.append(pd.DataFrame({(*part_names,label):values for label, values in zip([xlabel,ylabel],[x,y])}))
         
         df = pd.concat(data,axis=1)
         if not flatten:
-            df.columns.set_names(("type","path","region","label","axis"), inplace=True)
+            df.columns.set_names(COLUMN_LEVEL_NAMES, inplace=True)
         cls.add_attrs(df, kind)
         cls.store_dataframe(filename,df, txt_fmt = txt_fmt)
 
