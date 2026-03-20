@@ -31,7 +31,7 @@ from OES_toolbox.Widgets import SpectrumTreeItem
 from OES_toolbox.logger import Logger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
-from OES_toolbox.exporters import FileExport
+from OES_toolbox.exporters import FileExport, OESMatplotlibExporter
 
 from importlib.metadata import metadata
 scipy = lazy_import("scipy")
@@ -444,10 +444,8 @@ class Window(QMainWindow):
             
             
     def graph_to_clipboard(self):
-        fig = FileExport.graph_to_matplotlib(self.specplot)
-        img = FileExport.matplotlib_to_image(fig)
-        QApplication.clipboard().setImage(img)
-            
+        exporter=OESMatplotlibExporter(self.specplot.getPlotItem())
+        exporter.export(copy=True)            
 
 ##############################################################################
 # <-------------------- Plotting measurement data -------------------------> #

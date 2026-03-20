@@ -12,7 +12,7 @@ from matplotlib import style
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableWidget, QInputDialog
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableWidget, QInputDialog, QApplication
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt
 import pyqtgraph as pg
@@ -129,61 +129,6 @@ class FileExport:
             )
     
     @classmethod
-    def graph_to_matplotlib(cls, graph) -> Figure:
-        pre_select = 1 if FileExport.pickedLast is None else STYLES.index(FileExport.pickedLast)
-        picked,ok = QInputDialog.getItem(None,"Pick plot style","Pick the matplotlib stylesheets to apply", STYLES, pre_select, False)
-        cls.pickedLast = picked
-        with plt.style.context(picked,after_reset=True):
-            xlim,ylim = graph.getViewBox().viewRange()
-            fig = plt.figure(dpi=300)
-            for plot_item in graph.listDataItems():
-                if not plot_item.isVisible():
-                    continue
-                pen = plot_item.opts['pen']            
-                style_kws = {
-                    "c":pen.color().name(), 
-                    "zorder":plot_item.zValue(),
-                    "label": plot_item.name(),
-                    "lw": pen.width(),
-                }
-                match pen.style().name.lower():
-                    case "solidline":
-                        style_kws['ls'] = "-"
-                    case "dotline":
-                        style_kws['ls'] = ":"
-                    case 'dashline':
-                        style_kws['ls'] = "--"
-                    case "nopen":
-                        style_kws['ls']=''
-                if plot_item.name().startswith("file"):
-                    style_kws["label"]=plot_item.name().strip("file:").strip()
-                if plot_item.name().startswith("cont"):
-                    style_kws["lw"] = 1
-                elif plot_item.name().startswith('NIST'):
-                    style_kws["lw"] = 0.5
-                x,y = plot_item.getData()
-                plt.plot(x,y,**style_kws)
-            plt.xlim(xlim)
-            plt.ylim(ylim)
-            if graph.plotItem.legend.isVisible() and (len(graph.plotItem.legend.items)>0):
-                plt.legend()
-            plt.xlabel(graph.getAxis("bottom").label.toPlainText())
-            plt.ylabel(graph.getAxis("left").label.toPlainText())
-        return fig
-    
-    @staticmethod
-    def matplotlib_to_image(fig) -> QImage:
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        img = QImage(
-            canvas.buffer_rgba(), 
-            int(fig.figbbox.width),
-            int(fig.figbbox.height),
-            QImage.Format.Format_RGBA8888_Premultiplied
-        )
-        return img
-    
-    @classmethod
     def save_plot_data(cls, plot,kind:str="plot export", export=True):
         """"Save or export the plotted data.
         
@@ -275,11 +220,11 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
         self.addChildren(
             [
                 {"name":"dpi","value":144,"type":"int","bounds":(30,2400)},
-                {"name":"layout engine","type":"list","limits":["constrained","tight","from style"]},
+                {"name":"layout engine","type":"list","limits":["constrained","tight","from style"],"value":"constrained"},
                 {"name":"legend", "type": "group","children":
                     [
-                        {"name": "legend names","type":"list","limits":["full","short"]},
-                        {"name":"legend location","type":"list","limits":["best","upper left","upper right","lower left","lower right"]},
+                        {"name": "legend names","type":"list","limits":["full","short"],'value':"short"},
+                        {"name":"legend location","type":"list","limits":["best","upper left","upper right","lower left","lower right"],'value':"best"},
                         {"name":"legend handle length","type":"float","value":0.5,"bounds":(0.1,2)},
                     ]
                 },
@@ -331,8 +276,13 @@ class OESMatplotlibExporter(MatplotlibExporter):
     Also, the top and right axes are no longer removed, if they are shown in pyqtgraph as well, and enabled by the chosen stylesheets.
 
     To aid in legend legibility, it is possible to shorten names, reduce the handle length and shorten names, if needed.
+
+    Contrary to the default Matplotlib Exporter, this exporter can export a graph to the system clipboard.
+
+    When doing so, some settings are ignored to create a 'better image' (min dpi: 150)
     """
     Name = "Matplotlib (OESToolbox)"
+    allowCopy = True
 
     def __init__(self,item):
         super().__init__(item)
@@ -384,7 +334,7 @@ class OESMatplotlibExporter(MatplotlibExporter):
     def parameters(self)->PlotStyleParameters:
         return self.params
 
-    def export(self, fileName=None):
+    def export(self, fileName=None,copy=False):
         if not isinstance(self.item,PlotItem):
             QMessageBox.information(
                 None,
@@ -393,14 +343,18 @@ class OESMatplotlibExporter(MatplotlibExporter):
                 "Please select 'Plot' as the target of this export, not 'ViewBox' or 'Entire Scene'."
             )
             return
-        mpw = MatplotlibWindow()
-        MatplotlibExporter.windows.append(mpw)
-        abbreviate = self.params.child("legend")['legend names'].lower() == "short"
+        abbreviate = self.params.child("legend",'legend names').value().lower() == "short"
+
         with style.context(self.params.active_styles(), after_reset=True):
-            fig = mpw.getFigure()
+            if copy is True:
+                fig = plt.figure()
+            else:
+                mpw = MatplotlibWindow()
+                OESMatplotlibExporter.windows.append(mpw)
+                fig = mpw.getFigure()
             if self.params['layout engine'].lower()=="constrained":
                 fig.set_constrained_layout(True)
-            dpi=self.params['dpi']
+            dpi=max(self.params['dpi'],150) if copy else self.params['dpi']
             if fig.dpi!=dpi:
                 w_px, h_px = fig.canvas.width(), fig.canvas.height()
                 fig.set_size_inches(w_px / dpi, h_px / dpi,forward=True)
@@ -464,7 +418,18 @@ class OESMatplotlibExporter(MatplotlibExporter):
                 ax.legend(loc=self.params.child("legend")["legend location"], handlelength=self.params.child("legend")["legend handle length"])
             if self.params['layout engine'].lower()=="tight":
                 fig.tight_layout()
-            mpw.draw()
+            if copy:
+                canvas = FigureCanvas(fig)
+                canvas.draw()
+                img = QImage(
+                    canvas.buffer_rgba(), 
+                    int(fig.figbbox.width),
+                    int(fig.figbbox.height), 
+                    QImage.Format.Format_RGBA8888_Premultiplied
+                )
+                QApplication.clipboard().setImage(img)
+            else:
+                mpw.draw()
 
 class OESDataExporter(Exporter):
     """An exporter that exports graphed data from the OES-toolbox to a file (text, excel, parquet).
