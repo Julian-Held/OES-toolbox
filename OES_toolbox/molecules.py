@@ -52,7 +52,6 @@ def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
 
 def apply_voigt(sim, instr):
     """Function copied from Moose to allow arbitrary instrumental functions."""
-    from scipy.signal import fftconvolve
     x = sim[:, 0]
     conv = scipy.signal.fftconvolve(sim[:, 1], instr(x), mode="same")
     return np.array([x, conv]).T
@@ -122,7 +121,6 @@ class MoleculeFitter(QObject):
 
     def fit(self):
         self.progress.emit(1)
-        from scipy.optimize import curve_fit
 
         # A and the temps must be >0
         self.bounds = [list(np.zeros(len(self.p0))),
