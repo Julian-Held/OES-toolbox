@@ -645,7 +645,37 @@ class Window(QMainWindow):
         while iterator.value():
             iterator.value().setCheckState(0,Qt.CheckState.Unchecked)
             iterator += 1
-            
+
+    def get_bounds(self)->tuple[float,float,float,float]:
+        """Get the bounds to apply to the data from the UI state.
+        
+        Finds wavelength and signal ranges from plotted file data ranges.
+
+        If a user specified limit is active, determine the y bounds in this range instead.
+
+        When there is no data plotted from a file, falls back to the user specified limits (even if unchecked).
+
+        TODO: account for padding of the data range by the viewbox, causing ever increasing ranges with repeated actions.
+        """
+        orthoRange=[None,None]
+        min_x = self.mol_min_wl_sbox.value()
+        max_x = self.mol_max_wl_sbox.value()
+        if self.mol_limit_range_check.isChecked():
+            # orthoRange must provided limits of orthogonal axes, thus orthoRange[1] corresponds to x limits to apply when finding y bounds
+            orthoRange[1] = (min_x,max_x)
+
+        vb = self.specplot.getViewBox()
+        target_range = vb.targetRange()
+        file_items = [item for item in vb.addedItems if 'file' in item.name()]
+        
+        if len(file_items)<=0:
+            target_range[0]=[min_x,max_x]
+        bounds =vb.childrenBounds(orthoRange=orthoRange, items=file_items if len(file_items)>0 else None)
+        if bounds[0] is None:
+            bounds[0] = target_range[0]
+        if bounds[1] is None:
+            bounds[1] = target_range[1]
+        return [value for pair in bounds for value in pair]
 
 ##############################################################################
 # <--------------------------- drag & drop --------------------------------> #
