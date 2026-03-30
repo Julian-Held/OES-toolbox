@@ -239,7 +239,7 @@ class molecule_module:
         lw = -1
         
         
-        min_x, max_x, min_y ,max_y = self.mw.get_bounds()
+        min_x, max_x, min_y ,max_y = self.mw.get_bounds() # TODO: include min_y in bounds for calculations below as well.
         
         # x = np.linspace(min_x)
         for mol_sel in self.molecule_selectors:
