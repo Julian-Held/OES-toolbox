@@ -123,7 +123,6 @@ class MoleculeFitter(QObject):
 
     def fit(self):
         self.progress.emit(1)
-        from scipy.optimize import curve_fit
 
         # A and the temps must be >0
         self.bounds = [list(np.zeros(len(self.p0))),
