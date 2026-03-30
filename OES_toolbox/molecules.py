@@ -231,18 +231,14 @@ class molecule_module:
                     sim_y = get_mOES_spec(sim_x, Tvib, Trot, db, self.get_instr)
                     sim_y = sim_y / np.max(sim_y) * max_y
 
-                    self.mw.plot(sim_x, sim_y, 'molecule: ' + mol_sel.label 
-                                            + ' Tvib = ' + str(round(Tvib)) 
-                                            + ' Trot = ' + str(round(Trot)) )
+                    self.mw.plot(sim_x, sim_y, f"molecule: {mol_sel.label} Trot = {Trot:.0f} K Tvib = {Tvib:.0f} K")
                         
                 if mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
                     simy = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
                     simy = simy/np.max(simy) * max_y
 
-                    self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
-                                            + ' fixed temperature Tvib = 2500 K' 
-                                            + ' Trot = 500 K' )
+                    self.mw.plot(db.wl, simy, f"molecule: {mol_sel.label} fixed temperature Trot = 500 K Tvib = 2500 K")
 
         self.mw.update_spec_colors()
 
@@ -333,7 +329,7 @@ class molecule_module:
                 self.mw.mol_fit_results_table.insertColumn(col_count)
             self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
             header.append("Trot / K")
-            plot_label = plot_label + " Trot=" + str(round(ans[col],0))
+            plot_label += f"Trot={ans[col]:.0f} K"
             col = col + 1
 
         if not self.mw.mol_multifit_vib_check.isChecked():
@@ -342,19 +338,19 @@ class molecule_module:
                 self.mw.mol_fit_results_table.insertColumn(col_count)
             self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
             header.append("Tvib / K")
-            plot_label = plot_label + " Tvib=" + str(round(ans[col],0))
+            plot_label += f" Tvib={ans[col]:.0f} K"
             col = col + 1
 
 
         for mol_sel in self.molecule_selectors:
 
-            if mol_sel.isChecked() and mol_sel.can_fit == True:
+            if mol_sel.isChecked() and mol_sel.can_fit is True:
                 col_count = self.mw.mol_fit_results_table.columnCount()
                 if col_count < col + 1:
                     self.mw.mol_fit_results_table.insertColumn(col_count)
                 self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
                 header.append("intensity " + mol_sel.label)
-                plot_label = plot_label + " " + mol_sel.label + " "
+                plot_label += f" {mol_sel.label} "
                 col = col + 1
 
                 if self.mw.mol_multifit_rot_check.isChecked():
@@ -363,7 +359,7 @@ class molecule_module:
                         self.mw.mol_fit_results_table.insertColumn(col_count)
                     self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
                     header.append("Trot " + mol_sel.label)
-                    plot_label = plot_label + " Trot=" + str(round(ans[col],0))
+                    plot_label += f" Trot={ans[col]:.0f} K"
                     col = col + 1
 
                 if self.mw.mol_multifit_vib_check.isChecked():
@@ -372,7 +368,7 @@ class molecule_module:
                         self.mw.mol_fit_results_table.insertColumn(col_count)
                     self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
                     header.append("Tvib " + mol_sel.label)
-                    plot_label = plot_label + " Tvib=" + str(round(ans[col],0))
+                    plot_label += f" Tvib={ans[col]:.0f} K"
                     col = col + 1
         
         self.mw.mol_fit_results_table.setColumnCount(col)
@@ -415,7 +411,7 @@ class molecule_module:
 
     def clear_spec(self):
         for plot_item in self.mw.specplot.listDataItems():
-            if "molecule:" in plot_item.name():
+            if plot_item.name().startswith("molecule:"):
                 self.mw.specplot.removeItem(plot_item)
         self.mw.update_spec_colors()
                 
