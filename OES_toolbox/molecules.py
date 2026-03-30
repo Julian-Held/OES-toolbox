@@ -113,15 +113,17 @@ class MoleculeFitter(QObject):
             Tvib = p0.pop(0)
 
         specs = []
-        for db in self.molecule_dbs:
-            A = p0.pop(0)        
-            if self.sep_Trot:
-                Trot = p0.pop(0)
-            if self.sep_Tvib:
-                Tvib = p0.pop(0)
-            x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
-            this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
-            specs.append(this_spec)
+        for mol_sel in self.molecules:
+            if mol_sel.isChecked() and mol_sel.can_fit == True:
+                A = p0.pop(0)        
+                if self.sep_Trot:
+                    Trot = p0.pop(0)
+                if self.sep_Tvib:
+                    Tvib = p0.pop(0)
+                x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
+                db = mol_sel.get_db()
+                this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
+                specs.append(this_spec)
         
         return np.sum(specs, axis=0) + y0
 
@@ -203,9 +205,14 @@ class MoleculeFitter(QObject):
 # <------------------------- molecules module -----------------------------> #
 ##############################################################################   
 class molecule_module:
+class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
         self.get_instr = self.mw.settings.get_instr 
+        molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
+        molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
+        
+        self.molecule_selectors:list[MoleculeCheckBox] = []
         molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
         molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
         
@@ -225,8 +232,46 @@ class molecule_module:
             self.molecule_selectors.append(this_mol_check)
             self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
    
+        for i,molecule in enumerate(molecule_list_fit):
+            row,col = divmod(i,3)
+            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
+            this_mol_check.stateChanged.connect(self.change_sel)
+            self.molecule_selectors.append(this_mol_check)
+            self.mw.mol_select_grid.addWidget(this_mol_check, row, col)
+
+        for i,molecule in enumerate(molecule_list_no_fit):
+            row, col = divmod(i,3)
+            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
+            this_mol_check.stateChanged.connect(self.change_sel)
+            self.molecule_selectors.append(this_mol_check)
+            self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
+   
         self.mol_fit_threads = []
         self.mol_fit_workers = []
+        
+
+    def fitfunc(self, x, *args):
+        p0 = list(args) # needed for pop
+        y0 = p0.pop(0)
+
+        if not self.mw.mol_multifit_rot_check.isChecked():
+            Trot = p0.pop(0)
+        if not self.mw.mol_multifit_vib_check.isChecked():
+            Tvib = p0.pop(0)
+
+        specs = []
+        for mol_sel in self.molecule_selectors:
+            if mol_sel.isChecked() and mol_sel.can_fit is True:
+                A = p0.pop(0)        
+                if self.mw.mol_multifit_rot_check.isChecked():
+                    Trot = p0.pop(0)
+                if self.mw.mol_multifit_vib_check.isChecked():
+                    Tvib = p0.pop(0)
+                this_spec = A*get_mOES_spec(x, Tvib, Trot, mol_sel.get_db(), self.get_instr)
+                specs.append(this_spec)
+        
+        return np.sum(specs, axis=0) + y0
+
 
     def show_spec(self):
         self.clear_spec()
@@ -239,30 +284,31 @@ class molecule_module:
         lw = -1
         
         
-        min_x, max_x, min_y ,max_y = self.mw.get_bounds() # TODO: include min_y in bounds for calculations below as well.
+        min_x, max_x, min_y ,max_y = self.mw.get_bounds()
         
         # x = np.linspace(min_x)
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked(): 
                 db = mol_sel.get_db((min_x, max_x)) # will cache if not loaded yet
-                Trot = self.mw.mol_Trot_sbox.value() if mol_sel.src !="LIFBASE" else 500
-                Tvib = self.mw.mol_Tvib_sbox.value() if mol_sel.src !="LIFBASE" else 2500
-                tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else ''
-                label = f"molecule: {mol_sel.label}{tag} Trot = {Trot:.0f} K Tvib = {Tvib:.0f} K"
-                if db.shape[0]<1:
-                    sim_x = [min_x, max_x]
-                    sim_y = [0, 0]
-                elif mol_sel.src == "mOES" and mol_sel.can_fit:
+                if mol_sel.src == "mOES" and mol_sel.can_fit:
+                    Trot = self.mw.mol_Trot_sbox.value()
+                    Tvib = self.mw.mol_Tvib_sbox.value()
                     sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
                     sim_y = get_mOES_spec(sim_x, Tvib, Trot, db, self.get_instr)
                     sim_y = sim_y / np.max(sim_y) * max_y
-                elif mol_sel.src == "LIFBASE":
-                    instr = self.get_instr(db.wl)
-                    sim_x = db.wl
-                    sim_y = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
-                    sim_y = sim_y/np.max(sim_y) * max_y
 
-                self.mw.plot(sim_x, sim_y,label)
+                    self.mw.plot(sim_x, sim_y, 'molecule: ' + mol_sel.label 
+                                            + ' Tvib = ' + str(round(Tvib)) 
+                                            + ' Trot = ' + str(round(Trot)) )
+                        
+                if mol_sel.src == "LIFBASE":
+                    instr = self.get_instr(db.wl)
+                    simy = fftconvolve(db.I, instr/np.sum(instr), mode='same')
+                    simy = simy/np.max(simy) * max_y
+
+                    self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
+                                            + ' fixed temperature Tvib = 2500 K' 
+                                            + ' Trot = 500 K' )
 
         self.mw.update_spec_colors()
 
