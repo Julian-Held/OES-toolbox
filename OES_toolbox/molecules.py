@@ -303,7 +303,7 @@ class molecule_module:
                         
                 if mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
-                    simy = fftconvolve(db.I, instr/np.sum(instr), mode='same')
+                    simy = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
                     simy = simy/np.max(simy) * max_y
 
                     self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
