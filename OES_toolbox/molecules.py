@@ -44,8 +44,6 @@ LIFBASE_LABELS = {
 
 def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
     """Function copied from Moose without the normalization to the maximum. """
-    import Moose # free re-implementation of MassiveOES
-
     sticks = Moose.create_stick_spectrum(T_vib, T_rot, df_db=sim_db)
     refined = Moose.equidistant_mesh(sticks, wl_pad=wl_pad, resolution=resolution)
     simulation = apply_voigt(refined, instr)
@@ -56,13 +54,12 @@ def apply_voigt(sim, instr):
     """Function copied from Moose to allow arbitrary instrumental functions."""
     from scipy.signal import fftconvolve
     x = sim[:, 0]
-    conv = fftconvolve(sim[:, 1], instr(x), mode="same")
+    conv = scipy.signal.fftconvolve(sim[:, 1], instr(x), mode="same")
     return np.array([x, conv]).T
 
 def match_spectra(meas, sim):
     """Function copied from Moose to solve out of bounds errors."""
-    from scipy.interpolate import make_interp_spline as interp1d
-    interp = interp1d(sim[:, 0], sim[:, 1])
+    interp = scipy.interpolate.make_interp_spline(sim[:, 0], sim[:, 1])
     interp.extrapolate = False
     matched_y = interp(meas[:, 0])
     matched_y = np.nan_to_num(matched_y)
@@ -143,7 +140,7 @@ class MoleculeFitter(QObject):
             self.bounds[1].append(1)
 
         try:
-            ans, err = curve_fit(self.fitfunc, self.x, self.y, 
+            ans, err = scipy.optimize.curve_fit(self.fitfunc, self.x, self.y, 
                                     p0=self.p0, bounds=self.bounds)
             y_fit = self.fitfunc(self.x, *ans)
 
@@ -213,8 +210,6 @@ class molecule_module:
 
 
     def show_spec(self):
-        from scipy.signal import fftconvolve
-
         self.clear_spec()
             
         min_x = 0
@@ -244,7 +239,7 @@ class molecule_module:
                         
                 if mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
-                    simy = fftconvolve(db.I, instr/np.sum(instr), mode='same')
+                    simy = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
                     simy = simy/np.max(simy) * max_y
 
                     self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
