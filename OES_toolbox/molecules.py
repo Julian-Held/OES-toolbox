@@ -246,22 +246,8 @@ class molecule_module():
         Te = -1
         lw = -1
         
-        # find wavelength range and max_y from file spec
-        for plot_item in self.mw.specplot.listDataItems():
-            if "file" in plot_item.name():
-                x0, x1 = plot_item.dataBounds(0)
-                if lim_unset:
-                    min_x = x0
-                    max_x = x1
-                    max_y = plot_item.dataBounds(1)[1]
-                    lim_unset = False
-                
-                min_x = min(min_x, x0)
-                max_x = max(max_x, x1)
-
-        if self.mw.mol_limit_range_check.isChecked():
-            min_x = self.mw.mol_min_wl_sbox.value()
-            max_x = self.mw.mol_max_wl_sbox.value()
+        
+        min_x, max_x, min_y ,max_y = self.mw.get_bounds() # TODO: include min_y in bounds for calculations below as well.
         
         # x = np.linspace(min_x)
         for mol_sel in self.molecule_selectors:
