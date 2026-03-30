@@ -297,18 +297,14 @@ class molecule_module:
                     sim_y = get_mOES_spec(sim_x, Tvib, Trot, db, self.get_instr)
                     sim_y = sim_y / np.max(sim_y) * max_y
 
-                    self.mw.plot(sim_x, sim_y, 'molecule: ' + mol_sel.label 
-                                            + ' Tvib = ' + str(round(Tvib)) 
-                                            + ' Trot = ' + str(round(Trot)) )
+                    self.mw.plot(sim_x, sim_y, f"molecule: {mol_sel.label} Trot = {Trot:.0f} K Tvib = {Tvib:.0f} K")
                         
                 if mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
                     simy = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
                     simy = simy/np.max(simy) * max_y
 
-                    self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
-                                            + ' fixed temperature Tvib = 2500 K' 
-                                            + ' Trot = 500 K' )
+                    self.mw.plot(db.wl, simy, f"molecule: {mol_sel.label} fixed temperature Trot = 500 K Tvib = 2500 K")
 
         self.mw.update_spec_colors()
 
