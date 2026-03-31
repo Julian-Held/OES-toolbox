@@ -182,30 +182,6 @@ class molecule_module:
    
         self.mol_fit_threads = []
         self.mol_fit_workers = []
-        
-
-    def fitfunc(self, x, *args):
-        p0 = list(args) # needed for pop
-        y0 = p0.pop(0)
-
-        if not self.mw.mol_multifit_rot_check.isChecked():
-            Trot = p0.pop(0)
-        if not self.mw.mol_multifit_vib_check.isChecked():
-            Tvib = p0.pop(0)
-
-        specs = []
-        for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked() and mol_sel.can_fit is True:
-                A = p0.pop(0)        
-                if self.mw.mol_multifit_rot_check.isChecked():
-                    Trot = p0.pop(0)
-                if self.mw.mol_multifit_vib_check.isChecked():
-                    Tvib = p0.pop(0)
-                this_spec = A*get_mOES_spec(x, Tvib, Trot, mol_sel.get_db(), self.get_instr)
-                specs.append(this_spec)
-        
-        return np.sum(specs, axis=0) + y0
-
 
     def show_spec(self):
         self.clear_spec()
