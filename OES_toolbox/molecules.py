@@ -266,36 +266,34 @@ class molecule_module:
         Tvib0 = self.mw.mol_Tvib_sbox.value()
         A0 = np.max(y)
         p0 = [0.0,]
+        separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
+        separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
-        for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked() and mol_sel.can_fit == True:
-                mol_sel.load_db((x.min(), x.max())) # `x` is not guaranteed to be sorted/increasing
-                y0 = A0*get_mOES_spec(x, Tvib0, Trot0, mol_sel, self.get_instr)
-                A0 = A0*np.max(y)/np.max(y0)
 
-        if not self.mw.mol_multifit_rot_check.isChecked():
+        if not separate_Trot:
             p0.append(Trot0)
-        if not self.mw.mol_multifit_vib_check.isChecked():
+        if not separate_Tvib:
             p0.append(Tvib0)
 
         for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked() and mol_sel.can_fit == True:
+            if mol_sel.isChecked() and mol_sel.can_fit is True:
                 p0.append(A0)
-                if self.mw.mol_multifit_rot_check.isChecked():
+                if separate_Trot:
                     p0.append(Trot0)
-                if self.mw.mol_multifit_vib_check.isChecked():
+                if separate_Tvib:
                     p0.append(Tvib0)
 
         if self.mw.mol_limit_range_check.isChecked():
-            y = y[(x>self.mw.mol_min_wl_sbox.value())*(x<self.mw.mol_max_wl_sbox.value())]
-            x = x[(x>self.mw.mol_min_wl_sbox.value())*(x<self.mw.mol_max_wl_sbox.value())]
+            mask = (x>self.mw.mol_min_wl_sbox.value()) & (x<self.mw.mol_max_wl_sbox.value())
+            y = y[mask]
+            x = x[mask]
         
 
 
         mol_fit_thread = QThread()
         fit_worker = MoleculeFitter(label, x, y, p0, self.molecule_selectors, 
-                                    self.mw.mol_multifit_rot_check.isChecked(), 
-                                    self.mw.mol_multifit_vib_check.isChecked(),
+                                    separate_Trot, 
+                                    separate_Tvib,
                                     self.get_instr,
                                     self.mw.mol_wl_shift_check.isChecked(),
                                     self.mw.mol_wl_stretch_check.isChecked())
@@ -395,6 +393,10 @@ class molecule_module:
             for plot_item in self.mw.specplot.listDataItems():
                 if "file" in plot_item.name():
                     x,y = plot_item.getData()
+                    # Remove any element that has either x or y nan
+                    mask = ~np.isnan(x)& ~np.isnan(y)
+                    x = x[mask]
+                    y = y[mask]
                     self.fit_spec(x,y, plot_item.name().replace('file:',''))
                     
         if self.mw.mol_fit_what_combobox.currentIndex() == 1: # fit all checked
