@@ -330,6 +330,8 @@ class molecule_module:
     def fit_spec(self,x,y,label):    
         Trot0 = self.mw.mol_Trot_sbox.value()
         Tvib0 = self.mw.mol_Tvib_sbox.value()
+        A0 = np.max(y)
+        p0 = [0.0,]
         separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
         separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
