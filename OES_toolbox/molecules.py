@@ -113,17 +113,15 @@ class MoleculeFitter(QObject):
             Tvib = p0.pop(0)
 
         specs = []
-        for mol_sel in self.molecules:
-            if mol_sel.isChecked() and mol_sel.can_fit == True:
-                A = p0.pop(0)        
-                if self.sep_Trot:
-                    Trot = p0.pop(0)
-                if self.sep_Tvib:
-                    Tvib = p0.pop(0)
-                x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
-                db = mol_sel.get_db()
-                this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
-                specs.append(this_spec)
+        for db in self.molecule_dbs:
+            A = p0.pop(0)        
+            if self.sep_Trot:
+                Trot = p0.pop(0)
+            if self.sep_Tvib:
+                Tvib = p0.pop(0)
+            x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
+            this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
+            specs.append(this_spec)
         
         return np.sum(specs, axis=0) + y0
 
@@ -309,8 +307,6 @@ class molecule_module:
     def fit_spec(self,x,y,label):    
         Trot0 = self.mw.mol_Trot_sbox.value()
         Tvib0 = self.mw.mol_Tvib_sbox.value()
-        A0 = np.max(y)
-        p0 = [0.0,]
         separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
         separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
