@@ -12,6 +12,12 @@ from .Widgets import MoleculeCheckBox
 from .lazy_import import lazy_import
 scipy = lazy_import("scipy")
 Moose = lazy_import("Moose")
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from pandas import DataFrame
+    from collections.abc import Callable
+
 # Exclude high J Swan band database; can quickly run OOM without care
 MOLECULES = [f for f in Moose.database_files if "J300" not in f]
 MOLECULE_DB_LABELS = {
@@ -71,13 +77,14 @@ def get_mOES_spec(x, Tvib, Trot, data, instr):
 
 
 class MoleculeFitter(QObject):
-    def __init__(self, label, x, y, p0, molecules, sep_Trot, sep_Tvib, instr_func, 
+    def __init__(self, label, x, y, T_rot,T_vib, molecule_dbs:list["DataFrame"], sep_Trot:bool, sep_Tvib:bool, instr_func, 
                                             shift=False, stretch=False, parent=None):
         super(self.__class__, self).__init__(parent)
         self.label = label
         self.x, self.y = x,y
-        self.p0 = p0
-        self.molecules = molecules
+        self.T_rot = T_rot # initial value
+        self.T_vib = T_vib # initial value
+        self.molecule_dbs = molecule_dbs
         self.sep_Trot, self.sep_Tvib = sep_Trot, sep_Tvib
         self.get_instr = instr_func # function copy from Window class
         self.stop = False # stop flag invoked by button press
@@ -104,48 +111,84 @@ class MoleculeFitter(QObject):
             Tvib = p0.pop(0)
 
         specs = []
-        for mol_sel in self.molecules:
-            if mol_sel.isChecked() and mol_sel.can_fit == True:
-                A = p0.pop(0)        
-                if self.sep_Trot:
-                    Trot = p0.pop(0)
-                if self.sep_Tvib:
-                    Tvib = p0.pop(0)
-                x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
-                db = mol_sel.get_db()
-                this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
-                specs.append(this_spec)
+        for db in self.molecule_dbs:
+            A = p0.pop(0)        
+            if self.sep_Trot:
+                Trot = p0.pop(0)
+            if self.sep_Tvib:
+                Tvib = p0.pop(0)
+            x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
+            this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
+            specs.append(this_spec)
         
         return np.sum(specs, axis=0) + y0
 
+    def construct_fit_args(self):
+        """Create the initial estimates and bounds for `self.fitfunc`, replacing the `molecule_module.fit_spec` method.
 
+        Stopgap solution to avoid dependency on UI state which may change during fitting of many spectra.
+
+        Sadly `fitfunc` does quite a bit of argument mangling and has no consistent signature.
+
+        Rather than rework it, move to lmfit for a more consistent, predictable API.
+        """
+        y_min, y_max, y_std = self.y.min(), self.y.max(), self.y.std()
+        A0 = y_max-y_min
+        p0 = [y_min,]
+        bounds = [[-np.inf],[np.inf]]
+        
+
+        T_bounds = (1,np.inf) # bounds for temperatures
+        if not self.sep_Trot:
+            p0.append(self.T_rot)
+            bounds[0].append(T_bounds[0])
+            bounds[1].append(T_bounds[1])
+        if not self.sep_Tvib:
+            p0.append(self.T_vib)
+            bounds[0].append(T_bounds[0])
+            bounds[1].append(T_bounds[1])
+        # It seems for each species/database the following is appended: `(A0, Optional(T_rot), Optional(T_vib))`
+        # T_rot and T_vib are optional and only included if separately fitted.
+        for _ in range(len(self.molecule_dbs)):
+            p0.append(A0)
+            bounds[0].append(0)
+            bounds[1].append(np.inf)
+            if self.sep_Trot:
+                p0.append(self.T_rot)
+                bounds[0].append(T_bounds[0])
+                bounds[1].append(T_bounds[1])
+            if self.sep_Tvib:
+                p0.append(self.T_vib)
+                bounds[0].append(T_bounds[0])
+                bounds[1].append(T_bounds[1])
+        if self.shift:
+            p0.append(0)
+            bounds[0].append(-10)
+            bounds[1].append(10)
+        if self.stretch:
+            p0.append(0)
+            bounds[0].append(-1)
+            bounds[1].append(1)
+           
+        return p0,bounds
+            
     def fit(self):
         self.progress.emit(1)
-
-        # A and the temps must be >0
-        self.bounds = [list(np.zeros(len(self.p0))),
-                       list(np.ones(len(self.p0))*np.inf)] 
-        self.bounds[0][0] = -np.inf # y0 -> unbound
-
-        if self.shift:
-            self.p0.append(0.0)
-            self.bounds[0].append(-10) # shift -> +-10
-            self.bounds[1].append(10)
-
-        if self.stretch:
-            self.p0.append(0.0)
-            self.bounds[0].append(-1) # stretch -> +-1
-            self.bounds[1].append(1)
+        p0, bounds = self.construct_fit_args()
 
         try:
-            ans, err = scipy.optimize.curve_fit(self.fitfunc, self.x, self.y, 
-                                    p0=self.p0, bounds=self.bounds)
+            ans, err = scipy.optimize.curve_fit(
+                self.fitfunc, 
+                self.x, 
+                self.y, 
+                p0=p0, 
+                bounds=bounds
+            )
             y_fit = self.fitfunc(self.x, *ans)
 
         except Exception as e:
             print(e)
-            ans = np.array(self.p0)
-            # y_fit = np.zeros(len(self.x))
+            ans = np.array(p0)
             y_fit = self.fitfunc(self.x, *ans)
             
         self.result_ready.emit(self.label, ans, self.x, y_fit)
@@ -243,39 +286,35 @@ class molecule_module:
     def fit_spec(self,x,y,label):    
         Trot0 = self.mw.mol_Trot_sbox.value()
         Tvib0 = self.mw.mol_Tvib_sbox.value()
-        A0 = np.max(y)
-        p0 = [0.0,]
         separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
         separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
-
-        if not separate_Trot:
-            p0.append(Trot0)
-        if not separate_Tvib:
-            p0.append(Tvib0)
-
+        dbs = []
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked() and mol_sel.can_fit is True:
-                p0.append(A0)
-                if separate_Trot:
-                    p0.append(Trot0)
-                if separate_Tvib:
-                    p0.append(Tvib0)
+                db = mol_sel.get_db()
+                if db.shape[0]>0:
+                    dbs.append(db)
 
         if self.mw.mol_limit_range_check.isChecked():
             mask = (x>self.mw.mol_min_wl_sbox.value()) & (x<self.mw.mol_max_wl_sbox.value())
             y = y[mask]
             x = x[mask]
-        
-
 
         mol_fit_thread = QThread()
-        fit_worker = MoleculeFitter(label, x, y, p0, self.molecule_selectors, 
-                                    separate_Trot, 
-                                    separate_Tvib,
-                                    self.get_instr,
-                                    self.mw.mol_wl_shift_check.isChecked(),
-                                    self.mw.mol_wl_stretch_check.isChecked())
+        fit_worker = MoleculeFitter(
+            label=label, 
+            x=x, 
+            y=y, 
+            T_rot=Trot0,
+            T_vib=Tvib0, 
+            molecule_dbs=dbs,
+            sep_Trot=separate_Trot, 
+            sep_Tvib=separate_Tvib,
+            instr_func=self.get_instr,
+            shift=self.mw.mol_wl_shift_check.isChecked(),
+            stretch=self.mw.mol_wl_stretch_check.isChecked()
+        )
         
         fit_worker.moveToThread(mol_fit_thread)
         mol_fit_thread.started.connect(fit_worker.fit)
