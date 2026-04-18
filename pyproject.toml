@@ -74,7 +74,7 @@ include = [
 
 [tool.hatch.envs.default]
 installer = "uv"
-extra-dependencies = ["ipykernel","ipython","cx_Freeze>=8.0"]
+extra-dependencies = ["ipykernel","ipython","cx_Freeze>=8.0", "scipy<1.17"]
 
 [tool.hatch.envs.hatch-test]
 parallel = false
