@@ -14,7 +14,7 @@ def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
     """Function copied from Moose without the normalization to the maximum. """
     import Moose # free re-implementation of MassiveOES
 
-    sticks = Moose.create_stick_spectrum(T_vib, T_rot, sim_db)
+    sticks = Moose.create_stick_spectrum(T_vib, T_rot, df_db=sim_db)
     refined = Moose.equidistant_mesh(sticks, wl_pad=wl_pad, resolution=resolution)
     simulation = apply_voigt(refined, instr)
     sim_matched = match_spectra(x.reshape(-1, 1), simulation)
