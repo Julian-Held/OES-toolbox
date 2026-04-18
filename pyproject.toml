@@ -74,7 +74,7 @@ include = [
 
 [tool.hatch.envs.default]
 installer = "uv"
-extra-dependencies = ["ipykernel","ipython","cx_Freeze>=7.5"]
+extra-dependencies = ["ipykernel","ipython","cx_Freeze>=8.0"]
 
 [tool.hatch.envs.hatch-test]
 parallel = false
@@ -99,13 +99,16 @@ addopts = [
     "--import-mode=importlib",
 ]
 
+[tool.setuptools.dynamic]
+version = {attr = "OES_toolbox.__version__"}
+
 [tool.cxfreeze]
 executables = [
-    {script = "OES-toolbox.py", base = "gui", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
+    {script = "OES-toolbox.py", base = "console", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
 ]
 
 [tool.cxfreeze.build_exe]
-packages = ["astropy", "scipy", "sqlalchemy", "owlspec", "spexread" ]
+packages = ["astropy", "scipy", "sqlalchemy", "owlspec", "spexread", "pyarrow"]
 includes = ["pyqtgraph", "Moose"]
 
 [tool.cxfreeze.bdist_msi]
