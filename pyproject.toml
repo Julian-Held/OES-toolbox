@@ -104,7 +104,7 @@ version = {attr = "OES_toolbox.__version__"}
 
 [tool.cxfreeze]
 executables = [
-    {script = "OES-toolbox.py", base = "console", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
+    {script = "OES-toolbox.py", base = "gui", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
 ]
 
 [tool.cxfreeze.build_exe]
