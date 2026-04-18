@@ -16,6 +16,7 @@ from PyQt6 import QtCore
 from PyQt6.QtGui import QAction, QImage, QPixmap
 from PyQt6 import sip, QtGui
 import pyqtgraph as pg
+from pyqtgraph.GraphicsScene.exportDialog import ExportDialog
 import webbrowser
 import qtawesome as qta
 
@@ -30,7 +31,7 @@ from OES_toolbox.Widgets import SpectrumTreeItem
 from OES_toolbox.logger import Logger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
-from OES_toolbox.exporters import FileExport
+from OES_toolbox.exporters import FileExport, OESMatplotlibExporter
 
 from importlib.metadata import metadata
 scipy = lazy_import("scipy")
@@ -116,7 +117,6 @@ class Window(QMainWindow):
         top_ax.setHeight(7)
         self.specplot.setAxisItems({"top": top_ax, "right":right_ax})
         self.specplot.addLegend()
-        self.specplot.getViewBox().scene().contextMenu[0].setVisible(False)
 
         self.copy_plots_btn.clicked.connect(self.action_graph_to_clipboard.trigger)
         self.action_graph_to_clipboard.triggered.connect(self.graph_to_clipboard)
@@ -124,6 +124,7 @@ class Window(QMainWindow):
         self.actionRefresh_plots.triggered.connect(self.update_spec)
         self.proxy = pg.SignalProxy(self.specplot.scene().sigMouseMoved, rateLimit=90, slot=self.update_plot_pos)
         self.actionClear_Plots.triggered.connect(self.clear_all_spec)
+        self.action_save_data.triggered.connect(lambda: FileExport.save_plot_data(self.specplot,export=False))
     
         # file loading, plotting /drag & drop
         self.button_open.clicked.connect(self.actionOpenFolder.trigger)
@@ -236,7 +237,11 @@ class Window(QMainWindow):
         self.check_HideLegend.checkStateChanged.connect(
             lambda state: self.specplot.plotItem.legend.setVisible(state == Qt.CheckState.Checked)
         )
-
+        # customize the export dialog to display options better
+        export_dialog = ExportDialog(self.specplot.scene())
+        self.specplot.scene().exportDialog = export_dialog
+        export_dialog.setMinimumSize(300,550)
+        
 
 ##############################################################################
 # <-------------------- basic/general UI function -------------------------> #
@@ -439,10 +444,8 @@ class Window(QMainWindow):
             
             
     def graph_to_clipboard(self):
-        fig = FileExport.graph_to_matplotlib(self.specplot)
-        img = FileExport.matplotlib_to_image(fig)
-        QApplication.clipboard().setImage(img)
-            
+        exporter=OESMatplotlibExporter(self.specplot.getPlotItem())
+        exporter.export(copy=True)            
 
 ##############################################################################
 # <-------------------- Plotting measurement data -------------------------> #

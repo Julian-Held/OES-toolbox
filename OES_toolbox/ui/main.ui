@@ -1248,6 +1248,7 @@
     </widget>
     <addaction name="actionOpenFolder"/>
     <addaction name="actionOpenFiles"/>
+    <addaction name="action_save_data"/>
     <addaction name="menuExport"/>
     <addaction name="actionClearFiles"/>
    </widget>
@@ -1306,6 +1307,14 @@
   <action name="actionOpenFiles">
    <property name="text">
     <string>Open Files</string>
+   </property>
+  </action>
+  <action name="action_save_data">
+   <property name="text">
+    <string>Save data</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
    </property>
   </action>
   <action name="action_export_ident_table">

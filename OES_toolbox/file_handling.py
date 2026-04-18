@@ -28,6 +28,8 @@ pd = lazy_import("pandas")
 xr = lazy_import("xarray")
 spexread = lazy_import("spexread")
 
+COLUMN_LEVEL_NAMES = ("type","path","region","label","axis") # names of the column MultiIndex of a dataframe saved by OESToolbox
+
 class SpectraDataset:
     """A dataset of spectra recorded with the same wavelength axis and/or region of interest.
 
@@ -249,20 +251,20 @@ class FileLoader:
         if f.suffix.lower()==".par":
             df  = pd.read_parquet(f)
         else:
-            with f.open("r") as fo:
+            with f.open("r",encoding="utf-8") as fo:
                 if "plot export" in fo.readline():
-                    kwargs = {"header": [2,3,4,5],"index_col":None}
+                    kwargs = {"header": [0,1,2,3,4],"index_col":0}
+                    # skip to first few lines until data
+                    for _ in range(1,8):
+                        fo.readline()
+                    sep,dec = cls._infer_text_schema_from_line(fo.readline())
                 else:
                     return 
-            if f.suffix.lower()==".csv":
-                df = pd.read_csv(f,sep=',', decimal='.', encoding='utf-8', **kwargs)
-            else:
-                df = pd.read_csv(f,sep='\t', decimal='.', encoding='utf-8', **kwargs)
-            cols = df.columns.to_frame()
-            for idx, col in enumerate(cols.columns):     
-                cols.iloc[(0, idx)] = cols.iloc[(0, idx)].lstrip("# ")
-            df.columns = pd.MultiIndex.from_frame(cols)
-            df.columns.set_names(("type","path","label","axis"), inplace=True)
+            data_fmt = {"sep":sep,"decimal":dec}
+            df = pd.read_csv(f,**data_fmt, encoding='utf-8', comment="#",**kwargs)
+            if not all(left==right for left,right in zip(df.columns.names, COLUMN_LEVEL_NAMES, strict=True)):
+                # fallback for files exported without a MultiIndex for the columns.
+                df = cls._read_generic_text(f)
         return df
 
     @classmethod
@@ -275,14 +277,17 @@ class FileLoader:
         ext = f.suffix.lower()
         if ((b"OES toolbox" in sample) and (b"result" in sample)) or (sample.startswith(b"PAR1")):
             data = cls.read_oestoolbox_export(f)
-            spectra = []
-            num = 4 if f.suffix.lower()==".par" else 3
-            for n,g in data.T.groupby(["type","path"],sort=False):
-                # Group by unique starting wavelengths to cluster spectra with same axis.
-                for _nn,gg in g.iloc[::2,:].groupby(0, sort=False):
-                    x = gg.iloc[0,:].to_numpy()
-                    y = g.loc[[(*parts[:num],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
-                    spectra.append(SpectraDataset(x=x,y=y, name=": ".join(n).strip(": ")))
+            if isinstance(data.columns,pd.MultiIndex):
+                spectra = []
+                for n,g in data.T.groupby(list(COLUMN_LEVEL_NAMES[:3]),sort=False):
+                    # Group by unique starting wavelengths to cluster spectra with same axis.
+                    for _nn,gg in g.iloc[::2,:].groupby(0, sort=False):
+                        x = gg.iloc[0,:].to_numpy()
+                        y = g.loc[[(*parts[:4],"intensity") for parts in gg.index.drop_duplicates().to_list()]].T.to_numpy()
+                        print(f"{n=}")
+                        spectra.append(SpectraDataset(x=x,y=y, name=": ".join(n).strip(": ")))
+            else:
+                spectra = [SpectraDataset(data.iloc[:,i],data.iloc[:,i+1], name=data.columns[i].rsplit(":",1)[0].strip()) for i in range(0,len(data.columns),2)]
         elif b"Data measured with spectrometer [name]:" in sample:
             data = cls.read_avantes_txt(f)
             spectra = [SpectraDataset(x=data.iloc[:, 0],y=data.iloc[:, 1:])]
