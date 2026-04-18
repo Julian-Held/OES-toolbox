@@ -219,8 +219,8 @@ class PlotStyleParameters(parameterTypes.GroupParameter):
         super().__init__(name="Export options",**opts)
         self.addChildren(
             [
-                {"name":"dpi","value":144,"type":"int","bounds":(30,2400)},
-                {"name":"layout engine","type":"list","limits":["constrained","tight","from style"],"value":"constrained"},
+                {"name":"dpi","value":300,"type":"int","bounds":(30,2400)},
+                {"name":"layout engine","type":"list","limits":["constrained","tight","from style"],"value":"from style"},
                 {"name":"legend", "type": "group","children":
                     [
                         {"name": "legend names","type":"list","limits":["full","short"],'value':"short"},
