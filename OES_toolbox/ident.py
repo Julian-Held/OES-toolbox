@@ -71,18 +71,8 @@ class ident_module:
         self.mw.ident_table.setRowCount(0)
         
         # find wavelength range from file spec
-        for plot_item in self.mw.specplot.listDataItems():
-            if "file" in plot_item.name():
-                x0, x1 = plot_item.dataBounds(0)
-                if lim_unset:
-                    min_x = x0
-                    max_x = x1
-                    max_y = plot_item.dataBounds(1)[1]
-                    lim_unset = False
-                
-                min_x = min(min_x, x0)
-                max_x = max(max_x, x1)
-        
+        min_x, max_x, min_y, max_y = self.mw.get_bounds()
+
         # fetch options
         if self.mw.ident_int_cbox.currentIndex() == 1:
             Te = self.mw.ident_Te.value()
