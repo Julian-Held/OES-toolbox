@@ -435,38 +435,62 @@ class molecule_module:
         self.mw.mol_multitemp_group.setVisible(num_checked>=2)
           
     def clear_table(self):
-        self.mw.mol_fit_results_table.setRowCount(0)
+        """Delete table items row by row to ensure proper cleanup of associated plot items.
+        
+        Must traverse the table in reverse order to avoid index errors as rowCount changes during iteration.
+        """
+        for i in range(self.mw.mol_fit_results_table.rowCount()-1,-1,-1):
+            self.del_table_row(i)
 
     def del_table_row(self, row):
+        """Delete a row from the molecure fit results table and remove the associated plot item."""
+        plot_item = self.mw.mol_fit_results_table.item(row, 0).data(PlotItemRole)
+        self.mw.specplot.removeItem(plot_item)
+        plot_item.deleteLater()
         self.mw.mol_fit_results_table.removeRow(row)
 
+    def del_table_col(self,col):
+        """Delete a column from the fit result table.
+        
+        Will not remove the first column (i.e. the plot item label), since elements in this column contain required extra data in the UserRoles.
+        """
+        if col==0:
+            return
+        self.mw.mol_fit_results_table.removeColumn(col)
+
     def fit_results_rightClick(self, cursor):
+        """Show a right-click menu to interact with the fit result table."""
         row = self.mw.mol_fit_results_table.rowAt(cursor.y())
-        # col = self.mol_fit_results_table.columnAt(cursor.x())
-        plot_label = self.mw.mol_fit_results_table.item(row, 0).plot_label
+        col = self.mw.mol_fit_results_table.columnAt(cursor.x())
+        item = self.mw.mol_fit_results_table.itemAt(cursor)
+        # first column (i.e. the plot label) contains the extra UserRoles (FitResultRole, PlotItemRole)
+        item_col0 = self.mw.mol_fit_results_table.item(row, 0)
+        if item is None:
+            plotted_atm = False
+        else:
+            plot_item = item_col0.data(PlotItemRole)
+            plotted_atm = plot_item in set(self.mw.specplot.listDataItems())
 
         menu = QMenu()
         plot_action = QAction("Plot row", checkable=True)
         del_row_action = QAction("Remove row")
+        del_col_action = QAction("Remove column")
         clear_action = QAction("Clear table")
-        
-        plotted_atm = False
-        for plot_item in self.mw.specplot.listDataItems():
-            if "molecule: " + plot_label in plot_item.name():
-                plotted_atm = True
 
         if plotted_atm:
             plot_action.setChecked(True)
         else:
             plot_action.setChecked(False)
-
-        menu.addAction(plot_action)
-        menu.addAction(del_row_action)
+        if item:
+            menu.addAction(plot_action)
+            plot_action.triggered.connect(lambda: self.plotl_table_item(row, not plotted_atm))
+            menu.addAction(del_row_action)
+            del_row_action.triggered.connect(lambda: self.del_table_row(row))
+        if col !=0:
+            menu.addAction(del_col_action)
         menu.addAction(clear_action)
 
-        plot_action.triggered.connect(lambda: self.plotl_table_item(row, plot_action.isChecked()))
-        del_row_action.triggered.connect(lambda: self.del_table_row(row))
-        del_row_action.triggered.connect(lambda: self.plotl_table_item(row, False))
+        del_col_action.triggered.connect(lambda: self.del_table_col(col))
 
         clear_action.triggered.connect(self.clear_table)
 
@@ -474,18 +498,13 @@ class molecule_module:
 
 
     def plotl_table_item(self, row_idx, plot:bool):
+        """Add or remove a fit result plot to the graph, depending on if it is currently drawn or not."""
+        plot_item = self.mw.mol_fit_results_table.item(row_idx, 0).data(PlotItemRole)
         if plot:
-            y_fit = self.mw.mol_fit_results_table.item(row_idx, 0).y_fit
-            x_fit = self.mw.mol_fit_results_table.item(row_idx, 0).x_fit
-            plot_label = self.mw.mol_fit_results_table.item(row_idx, 0).plot_label
-            self.mw.plot(x_fit, y_fit, 'molecule: ' + plot_label)
-            self.mw.update_spec_colors()
+            self.mw.specplot.addItem(plot_item) 
         else:
-            plot_label = self.mw.mol_fit_results_table.item(row_idx, 0).plot_label
-            for plot_item in self.mw.specplot.listDataItems():
-                if "molecule: " + plot_label in plot_item.name():
-                    self.mw.specplot.removeItem(plot_item)
-            self.mw.update_spec_colors()     
+            self.mw.specplot.removeItem(plot_item)
+        self.mw.update_spec_colors()
 
 
     
