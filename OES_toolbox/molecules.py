@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetIt
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6 import QtGui
+import pyqtgraph as pg
 
 from .Widgets import MoleculeCheckBox
 from .lazy_import import lazy_import
