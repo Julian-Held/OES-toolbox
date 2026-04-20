@@ -18,6 +18,15 @@ if TYPE_CHECKING:
     from pandas import DataFrame
     from collections.abc import Callable
 
+import lmfit
+from Moose.lmfit import multi_species_objective
+
+PARAMARGS = ('vary',"min",'max')
+
+DEFAULT_PARAMS = Moose.default_params
+DEFAULT_PARAMS["T_vib"]['max'] = 25000
+DEFAULT_PARAMS["T_rot"]['max'] = 25000
+
 # Exclude high J Swan band database; can quickly run OOM without care
 MOLECULES = [f for f in Moose.database_files if "J300" not in f]
 MOLECULE_DB_LABELS = {
@@ -47,151 +56,119 @@ LIFBASE_LABELS = {
     'CNBX': "CN (B-X)"
 }
 
+# constants for UserRoles for storing fit results with QTableWidgetItems
+PlotItemRole = Qt.ItemDataRole.UserRole+1
+FitResultRole = Qt.ItemDataRole.UserRole+2
 
-def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
-    """Function copied from Moose without the normalization to the maximum. """
-    sticks = Moose.create_stick_spectrum(T_vib, T_rot, df_db=sim_db)
-    refined = Moose.equidistant_mesh(sticks, wl_pad=wl_pad, resolution=resolution)
-    simulation = apply_voigt(refined, instr)
-    sim_matched = match_spectra(x.reshape(-1, 1), simulation)
-    return sim_matched[:, 1]
 
-def apply_voigt(sim, instr):
-    """Function copied from Moose to allow arbitrary instrumental functions."""
-    x = sim[:, 0]
-    conv = scipy.signal.fftconvolve(sim[:, 1], instr(x), mode="same")
-    return np.array([x, conv]).T
+def make_fit_params(y, species:list[str], Trot:float, Tvib:float, mu:float, separate_Tvib=True, separate_Trot=True, vary_broadening=True, vary_shift=False) -> lmfit.parameter.Parameters:
+    """Construct suitable fit parameters with bounds for fitting a spectrum with the `Moose.lmfit.multi_species_objective` function.
 
-def match_spectra(meas, sim):
-    """Function copied from Moose to solve out of bounds errors."""
-    interp = scipy.interpolate.make_interp_spline(sim[:, 0], sim[:, 1])
-    interp.extrapolate = False
-    matched_y = interp(meas[:, 0])
-    matched_y = np.nan_to_num(matched_y)
-    return np.array([meas[:, 0], matched_y]).T
+    For each element in the `species` list, it will add `fraction` and optional `T_rot`/`T_vib` parameters, as appropriate.
+    
+    Will calculate bounds and set parameters as free/fixed depending on provided arguments, which can come from the UI state.
 
-def get_mOES_spec(x, Tvib, Trot, data, instr):
-    # TODO: explictily handle errors now that all exceptions are not silently ignored.
-    sim_y = model_for_fit(x, Trot, Tvib, data, instr)
-    return sim_y/np.sum(sim_y)
+    The parameter bounds are made assuming that `multi_species_objective` will be called with the `normalize` kwargs set to `True`.
+
+    This means that `fraction` should be interpreted as a non-normalized `weight` to the total intensity, and is affected by strength of emitter.
+
+    (Stronger emitters will cause a lower weight).
+
+    Arguments:
+        y (NDArray):            The array of y-data, to calculate offset parameter `b` and total amplitude `A` from.
+        species (list[str]):    List of species names, for the species that will be used in the model objective function
+        Trot (float):           Initial estimate of T_rot
+        Tvib (float):           Initial estimate of T_vib
+        mu (float):             Initial wavelength shift in nm.
+        separate_Tvib (bool):   Flag to use different vibrational temperatures for each species
+        separate_Trot (bool):   Flag to use different rotational temperatures for each species
+        vary_broadening (bool): Flag to optimize broadening parameters during fit, or leave them fixed.
+        vary_shift (bool):      Flag to vary the wavelength shift during fitting, or leave it fixed.
+    
+    Returns:
+        Parameters:     A lmfit.Parameters instance with parameter values and bounds configured according to the current UI settings.
+    """
+    #TODO: decide if using `normalize=True` or `False`.
+    separate_Tvib = separate_Tvib and (len(species)>1)
+    separate_Trot = separate_Trot and (len(species)>1)
+    y_min = y.min()
+    y_max = y.max()
+    y_diff = y_max-y_min
+    # var = (y-y_min).std()
+    params = lmfit.create_params(**DEFAULT_PARAMS)
+    params.add("b", y_min, True, y_min - y_diff, y_min + y_diff)
+    params.add("A", y_diff, vary =True, min = 0, max = y_diff*1.5)
+    # params.pop("A")  # use this if using `normalize=False`
+    params['sigma'].vary = vary_broadening
+    params['gamma'].vary = vary_broadening
+    params['mu'].vary = vary_shift
+    params['mu'].value = mu
+    params['T_rot'].value = Trot
+    params['T_vib'].value = Tvib
+    weight = 1/len(species)*y_diff
+    if separate_Tvib:
+        params.pop("T_vib")
+    if separate_Trot:
+        params.pop("T_rot")
+    for specie in species:
+        if separate_Trot:
+            params.add(f"T_rot_{specie}", value = Trot, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
+        if separate_Tvib:
+            params.add(f"T_vib_{specie}", value = Tvib, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
+        params.add(f"fraction_{specie}", weight,vary=True,min=0,max=1) # adjust if using `normalize=False`
+    return params
 
 
 class MoleculeFitter(QObject):
-    def __init__(self, label, x, y, T_rot,T_vib, molecule_dbs:list["DataFrame"], sep_Trot:bool, sep_Tvib:bool, instr_func, 
-                                            shift=False, stretch=False, parent=None):
+    finished = pyqtSignal()
+    result_ready = pyqtSignal(str, lmfit.minimizer.MinimizerResult, np.ndarray, np.ndarray)
+    progress = pyqtSignal(int)
+
+    
+    def __init__(self, label, x, y, T_rot,T_vib, molecule_dbs:dict[str,"DataFrame"], sep_Trot:bool, sep_Tvib:bool, instr_func, 
+                                            allow_shift=False, allow_stretch=False, parent=None):
         super(self.__class__, self).__init__(parent)
         self.label = label
         self.x, self.y = x,y
         self.T_rot = T_rot # initial value
         self.T_vib = T_vib # initial value
         self.molecule_dbs = molecule_dbs
-        self.sep_Trot, self.sep_Tvib = sep_Trot, sep_Tvib
+        self.sep_Trot = sep_Trot
+        self.sep_Tvib = sep_Tvib
         self.get_instr = instr_func # function copy from Window class
         self.stop = False # stop flag invoked by button press
-        self.shift, self.stretch = shift, stretch
+        self.allow_shift = allow_shift # Plot data is shifted itself, no need for a shift value if using plot data.
+        self.allow_stretch =  allow_stretch
 
-    finished = pyqtSignal()
-    result_ready = pyqtSignal(str, np.ndarray, np.ndarray, np.ndarray)
-    # data_ready = pyqtSignal(str, astropy.table.table.Table)
-    progress = pyqtSignal(int)
-
-
-    def fitfunc(self, x, *args):
-        p0 = list(args) # needed for pop
-        y0 = p0.pop(0)
-        stretch, shift = 0, 0
-        if self.stretch:
-            stretch = p0.pop(-1)
-        if self.shift:
-            shift = p0.pop(-1)
-
-        if not self.sep_Trot:
-            Trot = p0.pop(0)
-        if not self.sep_Tvib:
-            Tvib = p0.pop(0)
-
-        specs = []
-        for db in self.molecule_dbs:
-            A = p0.pop(0)        
-            if self.sep_Trot:
-                Trot = p0.pop(0)
-            if self.sep_Tvib:
-                Tvib = p0.pop(0)
-            x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
-            this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
-            specs.append(this_spec)
-        
-        return np.sum(specs, axis=0) + y0
-
-    def construct_fit_args(self):
-        """Create the initial estimates and bounds for `self.fitfunc`, replacing the `molecule_module.fit_spec` method.
-
-        Stopgap solution to avoid dependency on UI state which may change during fitting of many spectra.
-
-        Sadly `fitfunc` does quite a bit of argument mangling and has no consistent signature.
-
-        Rather than rework it, move to lmfit for a more consistent, predictable API.
-        """
-        y_min, y_max, y_std = self.y.min(), self.y.max(), self.y.std()
-        A0 = y_max-y_min
-        p0 = [y_min,]
-        bounds = [[-np.inf],[np.inf]]
-        
-
-        T_bounds = (1,np.inf) # bounds for temperatures
-        if not self.sep_Trot:
-            p0.append(self.T_rot)
-            bounds[0].append(T_bounds[0])
-            bounds[1].append(T_bounds[1])
-        if not self.sep_Tvib:
-            p0.append(self.T_vib)
-            bounds[0].append(T_bounds[0])
-            bounds[1].append(T_bounds[1])
-        # It seems for each species/database the following is appended: `(A0, Optional(T_rot), Optional(T_vib))`
-        # T_rot and T_vib are optional and only included if separately fitted.
-        for _ in range(len(self.molecule_dbs)):
-            p0.append(A0)
-            bounds[0].append(0)
-            bounds[1].append(np.inf)
-            if self.sep_Trot:
-                p0.append(self.T_rot)
-                bounds[0].append(T_bounds[0])
-                bounds[1].append(T_bounds[1])
-            if self.sep_Tvib:
-                p0.append(self.T_vib)
-                bounds[0].append(T_bounds[0])
-                bounds[1].append(T_bounds[1])
-        if self.shift:
-            p0.append(0)
-            bounds[0].append(-10)
-            bounds[1].append(10)
-        if self.stretch:
-            p0.append(0)
-            bounds[0].append(-1)
-            bounds[1].append(1)
-           
-        return p0,bounds
-            
     def fit(self):
         self.progress.emit(1)
-        p0, bounds = self.construct_fit_args()
-
-        try:
-            ans, err = scipy.optimize.curve_fit(
-                self.fitfunc, 
-                self.x, 
-                self.y, 
-                p0=p0, 
-                bounds=bounds
-            )
-            y_fit = self.fitfunc(self.x, *ans)
-
-        except Exception as e:
-            print(e)
-            ans = np.array(p0)
-            y_fit = self.fitfunc(self.x, *ans)
-            
-        self.result_ready.emit(self.label, ans, self.x, y_fit)
+        params=make_fit_params(
+            self.y,
+            species=self.molecule_dbs,
+            Trot = self.T_rot,
+            Tvib=self.T_vib,
+            mu = 0, # Plot data is shifted already
+            vary_shift = self.allow_shift,
+            separate_Tvib=self.sep_Tvib, 
+            separate_Trot=self.sep_Trot,
+            vary_broadening=True
+        )
+        # TODO: investigate if error handling is needed.
+        result = lmfit.minimize(
+            multi_species_objective,
+            params,
+            args=(self.x,),
+            kws=
+            {
+                "y":self.y,
+                "normalize":True,
+                **self.molecule_dbs
+            },
+            ftol=1e-10,
+            max_nfev = 2000
+        )
+        y_fit = multi_species_objective(result.params, x = self.x, normalize = True, **self.molecule_dbs)
+        self.result_ready.emit(self.label, result, self.x, y_fit)
         self.progress.emit(-1)
         self.finished.emit()
 
@@ -238,28 +215,30 @@ class molecule_module:
         
         
         min_x, max_x, min_y ,max_y = self.mw.get_bounds()
+        min_y = max(min_y, 0) # clamp to minimum of 0 for visualization
+
+        Trot = self.mw.mol_Trot_sbox.value()
+        Tvib = self.mw.mol_Tvib_sbox.value()
         
-        # x = np.linspace(min_x)
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked(): 
                 db = mol_sel.get_db((min_x, max_x)) # will cache if not loaded yet
-                Trot = self.mw.mol_Trot_sbox.value() if mol_sel.src !="LIFBASE" else 500
-                Tvib = self.mw.mol_Tvib_sbox.value() if mol_sel.src !="LIFBASE" else 2500
-                tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else ''
-                label = f"molecule: {mol_sel.label}{tag} Trot = {Trot:.0f} K Tvib = {Tvib:.0f} K"
                 if db.shape[0]<1:
                     sim_x = [min_x, max_x]
                     sim_y = [0, 0]
                 elif mol_sel.src == "mOES" and mol_sel.can_fit:
                     sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
-                    sim_y = get_mOES_spec(sim_x, Tvib, Trot, db, self.get_instr)
-                    sim_y = sim_y / np.max(sim_y) * max_y
+                    #TODO: support broadening once more
+                    sim_y = Moose.model_for_fit(sim_x, 0.001, 0.001, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
                 elif mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
                     sim_x = db.wl
                     sim_y = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
-                    sim_y = sim_y/np.max(sim_y) * max_y
-
+                    sim_y = sim_y/np.max(sim_y) * (max_y-min_y)+min_y
+                tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else '' # prefix string with space if not empty
+                tag_Trot = f"Trot = {Trot if mol_sel.src !='LIFBASE' else 500 :.0f} K"
+                tag_Tvib = f"Tvib = {Tvib if mol_sel.src !='LIFBASE' else 2500:.0f} K"
+                label = f"molecule: {mol_sel.label}{tag} {tag_Trot} {tag_Tvib}"
                 self.mw.plot(sim_x, sim_y,label)
 
         self.mw.update_spec_colors()
@@ -289,12 +268,12 @@ class molecule_module:
         separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
         separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
-        dbs = []
+        dbs = {}
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked() and mol_sel.can_fit is True:
                 db = mol_sel.get_db()
                 if db.shape[0]>0:
-                    dbs.append(db)
+                    dbs[mol_sel.ident] = db
 
         if self.mw.mol_limit_range_check.isChecked():
             mask = (x>self.mw.mol_min_wl_sbox.value()) & (x<self.mw.mol_max_wl_sbox.value())
@@ -303,17 +282,17 @@ class molecule_module:
 
         mol_fit_thread = QThread()
         fit_worker = MoleculeFitter(
-            label=label, 
-            x=x, 
-            y=y, 
-            T_rot=Trot0,
-            T_vib=Tvib0, 
-            molecule_dbs=dbs,
-            sep_Trot=separate_Trot, 
-            sep_Tvib=separate_Tvib,
-            instr_func=self.get_instr,
-            shift=self.mw.mol_wl_shift_check.isChecked(),
-            stretch=self.mw.mol_wl_stretch_check.isChecked()
+            label = label, 
+            x = x, 
+            y = y, 
+            T_rot = Trot0,
+            T_vib = Tvib0, 
+            molecule_dbs = dbs,
+            sep_Trot = separate_Trot, 
+            sep_Tvib = separate_Tvib,
+            instr_func = self.get_instr,
+            allow_shift = self.mw.mol_wl_shift_check.isChecked(),
+            allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
         )
         
         fit_worker.moveToThread(mol_fit_thread)
@@ -330,72 +309,85 @@ class molecule_module:
         self.mol_fit_workers.append(fit_worker)
 
 
-    def fit_ready(self, label, ans, x_fit, y_fit):
+    def fit_ready(self, label, ans:lmfit.minimizer.MinimizerResult, x_fit, y_fit):
+        def get_species_name(param_name,split_count=2):
+            """Construct a name for a species from a parameter name, if applicable."""
+            parts = param_name.split("_", split_count)
+            return MOLECULE_DB_LABELS.get(parts[split_count],parts[split_count].replace("_"," ")) if len(parts)>split_count else ""
+
         count = self.mw.mol_fit_results_table.rowCount()
         self.mw.mol_fit_results_table.insertRow(count)
+        table = self.mw.mol_fit_results_table
+        current_header = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
 
         self.mw.mol_fit_results_table.setItem(count, 0, QTableWidgetItem(label))
         header = ["file",]
         plot_label = ""
-        col = 1
+        #TODO: figure out using clean labels for the table, while mapping them to parameter names to populate cells
+        print("========================")
+        print("FIT result:")
 
-        if not self.mw.mol_multifit_rot_check.isChecked():
-            col_count = self.mw.mol_fit_results_table.columnCount()
-            if col_count < col + 1:
-                self.mw.mol_fit_results_table.insertColumn(col_count)
-            self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
-            header.append("Trot / K")
-            plot_label += f"Trot={ans[col]:.0f} K"
-            col = col + 1
-
-        if not self.mw.mol_multifit_vib_check.isChecked():
-            col_count = self.mw.mol_fit_results_table.columnCount()
-            if col_count < col + 1:
-                self.mw.mol_fit_results_table.insertColumn(col_count)
-            self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
-            header.append("Tvib / K")
-            plot_label += f" Tvib={ans[col]:.0f} K"
-            col = col + 1
-
-
-        for mol_sel in self.molecule_selectors:
-
-            if mol_sel.isChecked() and mol_sel.can_fit is True:
-                col_count = self.mw.mol_fit_results_table.columnCount()
-                if col_count < col + 1:
-                    self.mw.mol_fit_results_table.insertColumn(col_count)
-                self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
-                header.append("intensity " + mol_sel.label)
-                plot_label += f" {mol_sel.label} "
-                col = col + 1
-
-                if self.mw.mol_multifit_rot_check.isChecked():
-                    col_count = self.mw.mol_fit_results_table.columnCount()
-                    if col_count < col + 1:
-                        self.mw.mol_fit_results_table.insertColumn(col_count)
-                    self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
-                    header.append("Trot " + mol_sel.label)
-                    plot_label += f" Trot={ans[col]:.0f} K"
-                    col = col + 1
-
-                if self.mw.mol_multifit_vib_check.isChecked():
-                    col_count = self.mw.mol_fit_results_table.columnCount()
-                    if col_count < col + 1:
-                        self.mw.mol_fit_results_table.insertColumn(col_count)
-                    self.mw.mol_fit_results_table.setItem(count, col, QTableWidgetItem(str(round(ans[col],3))))
-                    header.append("Tvib " + mol_sel.label)
-                    plot_label += f" Tvib={ans[col]:.0f} K"
-                    col = col + 1
+        for p in ans.params:
+            print(f"{p}: {ans.params[p]}")
+            match p:
+                case s if "fraction" in s:
+                    # s = s.replace("_", " ")
+                    species_name = get_species_name(s,1)
+                    # col_name = f"fraction {species_name}"
+                    # if col_name not in current_header:
+                    #     header.append(col_name)
+                    if s not in current_header:
+                        header.append(s)
+                case s if "T_rot" in s:
+                    # s = s.replace("rot_","rot ")+" / K"
+                    species_name = get_species_name(s,2)
+                    # col_name = f"Trot {species_name} / K"
+                    # if col_name not in current_header:
+                    #     header.append(col_name)
+                    if s not in current_header:
+                        header.append(s)                   
+                    plot_label += f"Trot {species_name}={ans.params[p].value:.0f} K "
+                case s if "T_vib" in s:
+                    # s = s.replace("vib_","vib ")+" / K"
+                    species_name = get_species_name(s,2)
+                    # col_name = f"Tvib {species_name} / K"
+                    # if col_name not in current_header:
+                    #     header.append(col_name) 
+                    if s not in current_header:
+                        header.append(s)                   
+                    plot_label += f"Tvib {species_name}={ans.params[p].value:.0f} K "
+                case _:
+                    continue
+        print("========================")
+        print(header,current_header)
+        if header!=current_header:
+            complete_header = current_header+[h for h in header if h not in current_header]
+            table.setColumnCount(len(complete_header))
+            table.setHorizontalHeaderLabels(complete_header)
+        else:
+            complete_header = header
         
-        self.mw.mol_fit_results_table.setColumnCount(col)
-        self.mw.mol_fit_results_table.setHorizontalHeaderLabels(header)
+        row_idx = table.rowCount()-1
+        for p in list(set(ans.params)&set(complete_header)):
+            col_idx = complete_header.index(p)
+            item = QTableWidgetItem()
+            item.setData(Qt.ItemDataRole.DisplayRole,ans.params[p].value)
+            table.setItem(row_idx,col_idx,item)
+
         self.mw.mol_fit_results_table.item(count, 0).y_fit = y_fit
         self.mw.mol_fit_results_table.item(count, 0).x_fit = x_fit
-        self.mw.mol_fit_results_table.item(count, 0).plot_label = plot_label
 
-        for plot_item in self.mw.specplot.listDataItems():
-            if "file" in plot_item.name() and label in plot_item.name():
-                self.mw.plot(x_fit, y_fit, 'molecule: ' + plot_label)
+        # Create the plot item and associate it with the 'file name' cell as UserData, same as fit result, using `PlotItemRole`.
+        # Untill we use a proper MVC pattern, this may be a good start point to show e.g. residual etc.
+        plot_item = pg.PlotDataItem(x=x_fit,y=y_fit, name = f"molecule: {plot_label.strip()}")
+        table.item(row_idx, 0).setData(PlotItemRole,plot_item)
+        table.item(row_idx, 0).plot_item = plot_item
+        table.item(row_idx, 0).setData(FitResultRole,ans)
+        # TODO: consider how to avoid this loop, perhaps we need a reference to the object to be passed along?
+        is_shown = f"file: {label.strip()}" in {item.name() for item in self.mw.specplot.listDataItems()}
+        if is_shown:
+            self.mw.specplot.addItem(plot_item, ignoreBounds=True)
+
                     
         self.mw.update_spec_colors()
 
