@@ -126,3 +126,9 @@ ProgId = [
 Icon = [
     ["OEStoolboxIcon", "icon.ico"]
 ]
+
+[tool.cxfreeze.bdist_dmg]
+applications_shortcut = "True"
+
+[tool.cxfreeze.bdist_mac]
+bundle_name = "OES toolbox"
