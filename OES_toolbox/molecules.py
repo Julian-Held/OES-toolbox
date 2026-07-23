@@ -1,6 +1,8 @@
 import os
 import datetime
 import numpy as np
+from scipy.signal import fftconvolve
+
 from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetItem, \
         QMessageBox, QCheckBox, QMenu
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
@@ -22,7 +24,6 @@ def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
 
 def apply_voigt(sim, instr):
     """Function copied from Moose to allow arbitrary instrumental functions."""
-    from scipy.signal import fftconvolve
     x = sim[:, 0]
     conv = fftconvolve(sim[:, 1], instr(x), mode="same")
     return np.array([x, conv]).T
@@ -235,7 +236,6 @@ class molecule_module():
 
 
     def show_spec(self):
-        from scipy.signal import fftconvolve
 
         self.clear_spec()
             
