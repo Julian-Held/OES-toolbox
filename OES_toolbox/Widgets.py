@@ -9,7 +9,7 @@ import qtawesome as qta
 import Moose
 
 from OES_toolbox.file_handling import FileLoader, SpectraDataset
-from OES_toolbox.logger import Logger
+from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 
 pd = lazy_import("pandas")
@@ -24,11 +24,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     ignored_files = [".png", ".jpg", ".ico", ".svg", ".pdf", ".ipynb", ".py", ".pyc"]
     ignored_prefix = ["_","."]
-    logger = Logger(instance=None, context={"class":"SpectrumTreeItem"})
+    logger = ContextLogger(instance=None, context={"class":"SpectrumTreeItem"})
 
     _ICON_FOLDER = qta.icon("mdi6.folder")
     _ICON_FILE = qta.icon("mdi6.file-outline",color="gray")
-    _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold", color="black")
+    _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold")
     _ICON_BG = qta.icon("mdi.layers")
     _ICON_IO_ERROR = qta.icon("mdi6.file-outline","ei.remove", options=[{"color":"gray"},{"color":"red"}])
     _ICON_BG_ACTIVE = qta.icon("mdi6.file-minus-outline")

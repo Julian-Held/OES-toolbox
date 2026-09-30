@@ -28,10 +28,11 @@ from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
 from OES_toolbox.Widgets import SpectrumTreeItem
-from OES_toolbox.logger import Logger
+from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
 from OES_toolbox.exporters import FileExport, OESMatplotlibExporter
+from OES_toolbox.loggerWidget import LogWidget
 
 from importlib.metadata import metadata
 scipy = lazy_import("scipy")
@@ -89,7 +90,11 @@ class Window(QMainWindow):
         self.progress_bar.hide()
         self.status_msg = QLabel()
         self.statusBar().addPermanentWidget(self.status_msg)
-        self.logger = Logger(self)
+        self.logger = ContextLogger(self)
+        self.log_widget = LogWidget()
+        actionShowLog = self.menuView.addAction("Show log")
+        actionShowLog.triggered.connect(self.log_widget.show)
+        # self.progress_bar.hide()
         
         self.settings = settings(self)
         self.mol = molecule_module(self)
