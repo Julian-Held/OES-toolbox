@@ -116,9 +116,6 @@ class SpectrumTreeItem(QTreeWidgetItem):
         full_name =  f"{parent_name}{name_stem}".strip().strip("/").strip(":")
         return full_name
     
-    def is_plotted(self, plot):
-        return self.graph in plot.allChildItems()
-    
     @property
     def checked(self):
         return self.checkState(0) == Qt.CheckState.Checked
