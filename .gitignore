@@ -64,3 +64,6 @@ OES_toolbox/_version.py
 .pytest_cache
 .hypothesis
 tests/test_files/tests_*
+tests/test_files/*
+*.ipynb
+.hypothesis
