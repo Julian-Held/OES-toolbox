@@ -183,9 +183,7 @@ class MoleculeFitter(QObject):
 class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
-        self.get_instr = self.mw.settings.get_instr 
-        molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
-        molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
+        self.get_instr = self.mw.settings.get_instr
         
         self.molecule_selectors:list[MoleculeCheckBox] = []
         molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
@@ -193,20 +191,6 @@ class molecule_module:
         
         self.molecule_selectors:list[MoleculeCheckBox] = []
       
-        for i,molecule in enumerate(molecule_list_fit):
-            row,col = divmod(i,3)
-            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
-            this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
-            self.mw.mol_select_grid.addWidget(this_mol_check, row, col)
-
-        for i,molecule in enumerate(molecule_list_no_fit):
-            row, col = divmod(i,3)
-            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
-            this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
-            self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
-   
         for i,molecule in enumerate(molecule_list_fit):
             row,col = divmod(i,3)
             this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
