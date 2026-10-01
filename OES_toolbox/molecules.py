@@ -15,6 +15,7 @@ from .Widgets import MoleculeCheckBox
 from .lazy_import import lazy_import
 scipy = lazy_import("scipy")
 Moose = lazy_import("Moose")
+Moose.Simulation = lazy_import("Moose.Simulation")
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ PlotItemRole = Qt.ItemDataRole.UserRole+1
 FitResultRole = Qt.ItemDataRole.UserRole+2
 
 
-def make_fit_params(y, species:list[str], Trot:float, Tvib:float, mu:float, separate_Tvib=True, separate_Trot=True, vary_broadening=True, vary_shift=False) -> lmfit.parameter.Parameters:
+def make_fit_params(y, species:list[str], Trot:float, Tvib:float, sigma:float,gamma:float, mu:float, separate_Tvib=True, separate_Trot=True, vary_broadening=True, vary_shift=False) -> lmfit.parameter.Parameters:
     """Construct suitable fit parameters with bounds for fitting a spectrum with the `Moose.lmfit.multi_species_objective` function.
 
     For each element in the `species` list, it will add `fraction` and optional `T_rot`/`T_vib` parameters, as appropriate.
@@ -82,6 +83,8 @@ def make_fit_params(y, species:list[str], Trot:float, Tvib:float, mu:float, sepa
         species (list[str]):    List of species names, for the species that will be used in the model objective function
         Trot (float):           Initial estimate of T_rot
         Tvib (float):           Initial estimate of T_vib
+        sigma (float):          Initial estimate of Gaussian width in nm.
+        gamma (float):          Initial estimate of Lorentzian width in nm.
         mu (float):             Initial wavelength shift in nm.
         separate_Tvib (bool):   Flag to use different vibrational temperatures for each species
         separate_Trot (bool):   Flag to use different rotational temperatures for each species
@@ -102,10 +105,9 @@ def make_fit_params(y, species:list[str], Trot:float, Tvib:float, mu:float, sepa
     params.add("b", y_min, True, y_min - y_diff, y_min + y_diff)
     params.add("A", y_diff, vary =True, min = 0, max = y_diff*1.5)
     # params.pop("A")  # use this if using `normalize=False`
-    params['sigma'].vary = vary_broadening
-    params['gamma'].vary = vary_broadening
-    params['mu'].vary = vary_shift
-    params['mu'].value = mu
+    params['sigma'].set(value = sigma, vary=vary_broadening, min=1e-3,max=1)
+    params['gamma'].set(value=gamma, vary=vary_broadening, min=1e-3, max=1)
+    params['mu'].set(value = mu, vary=vary_shift)
     params['T_rot'].value = Trot
     params['T_vib'].value = Tvib
     weight = 1/len(species)*y_diff
@@ -128,7 +130,7 @@ class MoleculeFitter(QObject):
     progress = pyqtSignal(int)
 
     
-    def __init__(self, label, x, y, T_rot,T_vib, molecule_dbs:dict[str,"DataFrame"], sep_Trot:bool, sep_Tvib:bool, instr_func, 
+    def __init__(self, label, x, y, T_rot,T_vib, molecule_dbs:dict[str,"DataFrame"], sep_Trot:bool, sep_Tvib:bool, sigma:float, gamma:float, 
                                             allow_shift=False, allow_stretch=False, parent=None):
         super(self.__class__, self).__init__(parent)
         self.label = label
@@ -138,7 +140,8 @@ class MoleculeFitter(QObject):
         self.molecule_dbs = molecule_dbs
         self.sep_Trot = sep_Trot
         self.sep_Tvib = sep_Tvib
-        self.get_instr = instr_func # function copy from Window class
+        self.sigma = sigma
+        self.gamma = gamma
         self.stop = False # stop flag invoked by button press
         self.allow_shift = allow_shift # Plot data is shifted itself, no need for a shift value if using plot data.
         self.allow_stretch =  allow_stretch
@@ -150,6 +153,8 @@ class MoleculeFitter(QObject):
             species=self.molecule_dbs,
             Trot = self.T_rot,
             Tvib=self.T_vib,
+            sigma = self.sigma,
+            gamma = self.gamma,
             mu = 0, # Plot data is shifted already
             vary_shift = self.allow_shift,
             separate_Tvib=self.sep_Tvib, 
@@ -183,7 +188,6 @@ class MoleculeFitter(QObject):
 class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
-        self.get_instr = self.mw.settings.get_instr
         
         self.molecule_selectors:list[MoleculeCheckBox] = []
         molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
@@ -208,6 +212,19 @@ class molecule_module:
         self.mol_fit_threads = []
         self.mol_fit_workers = []
 
+    def get_instr(self) -> tuple[float, float]:
+        """Return broadening parameters for a Voigt profile (σ, γ), using the values set in the main window.
+        
+        Note that σ corresponds to Gaussian standard deviation, while the γ is the half-width at half-maximum (HWHM) of the Lorentzian component.
+
+        This is compatible with the `Moose.Simulation.vgt` function, which should be used to compute the broadening profile.
+
+        This is because the function only needs a grid-size and grid-spacing as additional input, so we don't need to know the actual wavelengths each time.
+
+        Note: this replaces the previous approach of a shallow reference to `OES_toolbox.settings.settings.get_instr` which would return a instrumental profile.
+        """
+        return (self.mw.mol_instr_w.value(), self.mw.mol_instr_gamma.value())
+
     def show_spec(self):
         self.clear_spec()
             
@@ -224,20 +241,20 @@ class molecule_module:
 
         Trot = self.mw.mol_Trot_sbox.value()
         Tvib = self.mw.mol_Tvib_sbox.value()
+        sigma, gamma = self.get_instr()
         
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked(): 
-                db = mol_sel.get_db((min_x, max_x)) # will cache if not loaded yet
+                db = mol_sel.get_db() # will cache if not loaded yet
                 if db.shape[0]<1:
                     sim_x = [min_x, max_x]
                     sim_y = [0, 0]
                 elif mol_sel.src == "mOES" and mol_sel.can_fit:
                     sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
-                    #TODO: support broadening once more
-                    sim_y = Moose.model_for_fit(sim_x, 0.001, 0.001, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
+                    sim_y = Moose.model_for_fit(sim_x, sigma, gamma, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
                 elif mol_sel.src == "LIFBASE":
-                    instr = self.get_instr(db.wl)
                     sim_x = db.wl
+                    instr = Moose.Simulation.vgt(sigma, gamma, len(db.wl), np.abs(db.wl[1]-db.wl[0]))
                     sim_y = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
                     sim_y = sim_y/np.max(sim_y) * (max_y-min_y)+min_y
                 tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else '' # prefix string with space if not empty
@@ -284,7 +301,7 @@ class molecule_module:
             mask = (x>self.mw.mol_min_wl_sbox.value()) & (x<self.mw.mol_max_wl_sbox.value())
             y = y[mask]
             x = x[mask]
-
+        sigma,gamma = self.get_instr()
         mol_fit_thread = QThread()
         fit_worker = MoleculeFitter(
             label = label, 
@@ -295,7 +312,8 @@ class molecule_module:
             molecule_dbs = dbs,
             sep_Trot = separate_Trot, 
             sep_Tvib = separate_Tvib,
-            instr_func = self.get_instr,
+            sigma = sigma,
+            gamma = gamma,
             allow_shift = self.mw.mol_wl_shift_check.isChecked(),
             allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
         )
