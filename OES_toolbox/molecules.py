@@ -181,7 +181,6 @@ class MoleculeFitter(QObject):
 # <------------------------- molecules module -----------------------------> #
 ##############################################################################   
 class molecule_module:
-class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
         self.get_instr = self.mw.settings.get_instr 
