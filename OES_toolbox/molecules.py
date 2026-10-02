@@ -11,7 +11,7 @@ from PyQt6.QtGui import QAction
 from PyQt6 import QtGui
 import pyqtgraph as pg
 
-from .Widgets import MoleculeCheckBox
+from .Widgets import MoleculeCheckBox, SpectrumTreeItem
 from .lazy_import import lazy_import
 scipy = lazy_import("scipy")
 Moose = lazy_import("Moose")
@@ -19,8 +19,9 @@ Moose.Simulation = lazy_import("Moose.Simulation")
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from pandas import DataFrame
     from collections.abc import Callable
+
+    from pandas import DataFrame
 
 import lmfit
 from Moose.lmfit import multi_species_objective
@@ -267,8 +268,10 @@ class molecule_module:
 
 
     def fit_children(self,item):
-        """ Recursivly walks through all children of selected tree item. Calls
-        fit_filetree_item for each leaf. """
+        """Recursivly walks through all children of selected tree item and calls `fit_filetree_item` for each leaf.
+
+        If the item is a leaf (i.e. has no children) itself, calls fit_filetree_item directly.
+        """
         if item.childCount() == 0:
             self.fit_filetree_item(item)
         else:
@@ -277,11 +280,26 @@ class molecule_module:
                 self.fit_children(child) 
                 
                 
-    def fit_filetree_item(self, this_item):
-        """ Walks up the tree to assemble the path. """
+    def fit_filetree_item(self, this_item:SpectrumTreeItem):
+        """Schedule a single spectrum to be fitted.
+        
+        Performs `nan` masking on the input data to avoid these causing issues when fitting.
+        #TODO: Arguably this should be handled in the fitting thread instead.
+
+        Will early return when attempting to fit an item that has not been loaded.
+        This is because the item can be a deeply nested item once loaded, or fail to load, instead of it being a leaf node.
+        Fail early, instead of assuming the user would like to load the data and recursively fit it.
+        Instead, notify through a log message and let them load the data.
+        """
+        if not this_item.is_loaded:
+            self.mw.logger.warning(f"Cannot fit: {this_item.name()} is not loaded. Please load data first.")
+            self.mw.status_msg.setText(f"Open file {this_item.name()} first, fit has been skipped.")
+            # TODO: consider adding a brief popup dialog to be more loud?
+            return
         self.mw.logger.info(f"Fitting: {this_item.name()}")
         x,y = this_item.spectrum
-        self.fit_spec(x,y,this_item.name())
+        mask = ~np.isnan(x) & ~np.isnan(y)
+        self.fit_spec(x[mask],y[mask],this_item.name())
         
     
     def fit_spec(self,x,y,label):    
@@ -411,38 +429,43 @@ class molecule_module:
         if is_shown:
             self.mw.specplot.addItem(plot_item, ignoreBounds=True)
 
-                    
-        self.mw.update_spec_colors()
+        # this is already called through a signal when each fit worker finishes.            
+        # self.mw.update_spec_colors()
 
 
-    def fit(self):
+    def on_fit_clicked(self):
+        """Fires the fit callback when the 'Fit' button is pressed, scheduling the work.
+        
+        Determines which items to fit based on the selected fit mode in the combobox.
+
+        Takes care of only fitting an item once if it both it and an ancestor are 'active'.
+
+        Any item that has not been loaded yet will be skipped (though this actuallyhappens in `fit_filetree_item`).
+        """
+        # TODO: do we really want to always clear this?
         for plot_item in self.mw.specplot.listDataItems():
             if "molecule:" in plot_item.name():
                 self.mw.specplot.removeItem(plot_item)
                 
-        # self.mol_fit_results_table.setRowCount(0)
-
-        if self.mw.mol_fit_what_combobox.currentIndex() == 0: # fit all shown
-            for plot_item in self.mw.specplot.listDataItems():
-                if "file" in plot_item.name():
-                    x,y = plot_item.getData()
-                    # Remove any element that has either x or y nan
-                    mask = ~np.isnan(x)& ~np.isnan(y)
-                    x = x[mask]
-                    y = y[mask]
-                    self.fit_spec(x,y, plot_item.name().replace('file:',''))
-                    
-        if self.mw.mol_fit_what_combobox.currentIndex() == 1: # fit all checked
-            iterator = QTreeWidgetItemIterator(self.mw.file_list,QTreeWidgetItemIterator.IteratorFlag.Checked)
-            while iterator.value():
-                this_item = iterator.value()
-                iterator += 1
-                # Fit only when not already fitted as child of parent
-                if this_item.parent() is not None:
-                    if not this_item.parent()._is_checked_with_ancestors():
-                        self.fit_children(this_item)
-                else:
-                    self.fit_children(this_item) 
+        # When fit mode = "all shown" examine each leaf node; if "all checked" examine each checked node.
+        # Note: for any item that has not been loaded, the check happens in`fit_children`/`fit_filetree_item`, no need to check here.
+        must_fit_checked = self.mw.mol_fit_what_combobox.currentIndex() == 1
+        flag = QTreeWidgetItemIterator.IteratorFlag.Checked if must_fit_checked else QTreeWidgetItemIterator.IteratorFlag.NoChildren
+        iterator = QTreeWidgetItemIterator(self.mw.file_list, flag)
+        while iterator.value():
+            this_item: SpectrumTreeItem = iterator.value()
+            iterator+=1
+            # All-shown: Fit any childless item (see `flag``) that is marked active in the ancestry-chain
+            if not must_fit_checked:
+                if this_item.is_active(with_ancestors=True):
+                    self.fit_filetree_item(this_item)
+                continue
+            # All-checked: only fit if not already fitted as child of parent
+            parent:SpectrumTreeItem|None = this_item.parent()
+            if parent is not None and parent._is_checked_with_ancestors():
+                # If node has a parent which is checked, it will be selected for fitting as a child already
+                continue
+            self.fit_children(this_item)
 
     def clear_spec(self):
         for plot_item in self.mw.specplot.listDataItems():
