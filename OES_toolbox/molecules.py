@@ -189,25 +189,20 @@ class MoleculeFitter(QObject):
 class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
-        
-        self.molecule_selectors:list[MoleculeCheckBox] = []
-        molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
+        self.active_molecules: set[MoleculeCheckBox] = set()
+        molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"Moose"} for k in MOLECULES]
         molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
-        
-        self.molecule_selectors:list[MoleculeCheckBox] = []
       
         for i,molecule in enumerate(molecule_list_fit):
             row,col = divmod(i,3)
             this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
             this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
             self.mw.mol_select_grid.addWidget(this_mol_check, row, col)
 
         for i,molecule in enumerate(molecule_list_no_fit):
             row, col = divmod(i,3)
             this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
             this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
             self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
    
         self.mol_fit_threads = []
@@ -226,6 +221,31 @@ class molecule_module:
         """
         return (self.mw.mol_instr_w.value(), self.mw.mol_instr_gamma.value())
 
+
+    def get_databases(self):
+        """Return a dict with all databases selected for fitting, optionally loading those that have not been loaded yet.
+        
+        Will filter down databases to the current active wavelength region of interest, either by active data range, or by user-specified bounds.
+
+        When there are databases that have not yet been loaded, shows a progress dialog while loading them, to make this evident to the user.
+
+        Some (small) datbases load fast, but others can be noticeably slow.
+        """
+        dbs = {}
+        to_load = sum(elem.can_fit and (elem._db is None) for elem in self.active_molecules)
+        if to_load>0:
+            with pg.ProgressDialog("Loading databases...", cancelText=None, wait=0, busyCursor=True,maximum=to_load) as loading_dialog:
+                for elem in (mol for mol in self.active_molecules if mol.can_fit):
+                    if (elem._db is None):
+                        loading_dialog.setLabelText(f"Loading line-by-line database: {elem.label}")
+                        QtWidgets.QApplication.processEvents() # make sure the label has updated
+                        elem._load_database()
+                        loading_dialog+=1
+        for elem in (mol for mol in self.active_molecules if mol.can_fit):
+            dbs[elem.ident] = elem.get_db()
+        return dbs
+
+
     def show_spec(self):
         self.clear_spec()
             
@@ -243,26 +263,27 @@ class molecule_module:
         Trot = self.mw.mol_Trot_sbox.value()
         Tvib = self.mw.mol_Tvib_sbox.value()
         sigma, gamma = self.get_instr()
+
+        self.get_databases() # Cache any database; LIFBASE spectra are loaded in the loop if needed
         
-        for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked(): 
-                db = mol_sel.get_db() # will cache if not loaded yet
-                if db.shape[0]<1:
-                    sim_x = [min_x, max_x]
-                    sim_y = [0, 0]
-                elif mol_sel.src == "mOES" and mol_sel.can_fit:
-                    sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
-                    sim_y = Moose.model_for_fit(sim_x, sigma, gamma, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
-                elif mol_sel.src == "LIFBASE":
-                    sim_x = db.wl
-                    instr = Moose.Simulation.vgt(sigma, gamma, len(db.wl), np.abs(db.wl[1]-db.wl[0]))
-                    sim_y = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
-                    sim_y = sim_y/np.max(sim_y) * (max_y-min_y)+min_y
-                tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else '' # prefix string with space if not empty
-                tag_Trot = f"Trot = {Trot if mol_sel.src !='LIFBASE' else 500 :.0f} K"
-                tag_Tvib = f"Tvib = {Tvib if mol_sel.src !='LIFBASE' else 2500:.0f} K"
-                label = f"molecule: {mol_sel.label}{tag} {tag_Trot} {tag_Tvib}"
-                self.mw.plot(sim_x, sim_y,label)
+        for mol_sel in self.active_molecules:
+            db = mol_sel.get_db() # Loads LIFBASE if needed
+            if db.shape[0]<1:
+                sim_x = [min_x, max_x]
+                sim_y = [0, 0]
+            elif mol_sel.src == "Moose" and mol_sel.can_fit:
+                sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
+                sim_y = Moose.model_for_fit(sim_x, sigma, gamma, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
+            elif mol_sel.src == "LIFBASE":
+                sim_x = db.wl.to_numpy()
+                instr = Moose.Simulation.vgt(sigma, gamma, len(sim_x), np.abs(sim_x[1]-sim_x[0]))
+                sim_y = scipy.signal.fftconvolve(db.I, instr, mode='same') # Instr is normalized
+                sim_y = sim_y/np.max(sim_y) * (max_y-min_y)+min_y
+            tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else '' # prefix string with space if not empty
+            tag_Trot = f"Trot = {Trot if mol_sel.src !='LIFBASE' else 500 :.0f} K"
+            tag_Tvib = f"Tvib = {Tvib if mol_sel.src !='LIFBASE' else 2500:.0f} K"
+            label = f"molecule: {mol_sel.label}{tag} {tag_Trot} {tag_Tvib}"
+            self.mw.plot(sim_x, sim_y,label)
 
         self.mw.update_spec_colors()
 
@@ -308,12 +329,7 @@ class molecule_module:
         separate_Trot = self.mw.mol_multifit_rot_check.isChecked()
         separate_Tvib = self.mw.mol_multifit_vib_check.isChecked()
 
-        dbs = {}
-        for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked() and mol_sel.can_fit is True:
-                db = mol_sel.get_db()
-                if db.shape[0]>0:
-                    dbs[mol_sel.ident] = db
+        dbs = self.get_databases()
 
         if self.mw.mol_limit_range_check.isChecked():
             mask = (x>self.mw.mol_min_wl_sbox.value()) & (x<self.mw.mol_max_wl_sbox.value())
@@ -344,7 +360,7 @@ class molecule_module:
         fit_worker.finished.connect(fit_worker.deleteLater)
         mol_fit_thread.finished.connect(mol_fit_thread.deleteLater)
         mol_fit_thread.start()
-        # We neet to store the local objects in a "self" list to ensure
+        # We need to store the local objects in a "self" list to ensure
         # they are not garbage collected right after the button press
         self.mol_fit_threads.append(mol_fit_thread) 
         self.mol_fit_workers.append(fit_worker)
@@ -454,11 +470,19 @@ class molecule_module:
         self.mw.update_spec_colors()
                 
     def change_sel(self):
-        num_checked = 0
-        for mol_sel in self.molecule_selectors:
-            if mol_sel.isChecked() and mol_sel.can_fit: 
-                num_checked = num_checked + 1
-        self.mw.mol_multitemp_group.setVisible(num_checked>=2)
+        """Callback responsible for adding/removing `MoleculeCheckBox`s to the set of active ones (`self.active_molecules`).
+        
+        When active, the database or spectrum of the `MoleculeCheckBox` will be shown or fitted.
+
+        When 2 or more line-by-line databases are active, the multi-temperature fitting group will be shown.
+        """
+        sender = self.mw.sender()
+        if not isinstance(sender,MoleculeCheckBox):
+            return
+        self.active_molecules.add(sender) if sender.isChecked() else self.active_molecules.discard(sender)
+        if sender.can_fit:
+            self.mw.mol_multitemp_group.setVisible(sum(int(x.can_fit) for x in self.active_molecules) >= 2)
+        
           
     def clear_table(self):
         """Delete table items row by row to ensure proper cleanup of associated plot items.

@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
 from PyQt6.QtGui import QAction,QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 import pyqtgraph as pg
 import qtawesome as qta
 
@@ -423,12 +423,16 @@ class MoleculeCheckBox(QCheckBox):
     A subset of the data (in wavelength range), can be obtained using the `get_db` method.
     """
 
+    signalLoadingStarted = pyqtSignal(str)
+    signalLoadingDone = pyqtSignal()
+
     def __init__(self, ident: str, label: str = None, src: str = "LIFBASE", parent=None):
         super().__init__(parent=parent)
         self.ident = ident
         self.label = ident if label is None else label
         self.src = src
-        self.can_fit = self.src == "mOES"
+        self.can_fit = self.src == "Moose"
+        self.colname_wl = 'wl' if self.src.upper()=="LIFBASE" else 'air_wavelength'
         self.setText(self.label)
         self._db = None
 
@@ -446,18 +450,18 @@ class MoleculeCheckBox(QCheckBox):
         No filtering/slicing is applied to the database, so it can be cached and re-used effectively.
         """
         if self.can_fit and self._db is None:
-            with pg.ProgressDialog(f"Loading line-by-line database: {self.label}",cancelText=None,wait=0,busyCursor=True) as _diag:
-                self._db = Moose.query_DB(self.ident)
+            self.signalLoadingStarted.emit(f"Loading: {self.label}")
+            self._db = Moose.query_DB(self.ident)
+            self.signalLoadingDone.emit()
         elif not self.can_fit and self.src=="LIFBASE" and self._db is None:
-            with pg.ProgressDialog(f"Loading LIFBASE simulation: {self.label}",cancelText=None, wait=0) as _diag:
-                # Read the LIFBASE output files, which use lots of whitespace padding and must thus be coerced to float rather than string
-                # FileLoader._read_generic_text fails correctly detecting separator/delimiter because of whitespacing.
-                file_path = f"{Path(__file__).parent}/data/mol_spec/{self.ident}.mod"
-                data = pd.read_csv(file_path,header=None, sep=",",decimal='.',dtype=float,names=["wl","I"])
-                data.wl=data.iloc[:,0]/10 # Angstrom to nm
-                self._db = data
+            # Read the LIFBASE output files, which use lots of whitespace padding and must thus be coerced to float rather than string
+            # FileLoader._read_generic_text fails correctly detecting separator/delimiter because of whitespacing.
+            file_path = f"{Path(__file__).parent}/data/mol_spec/{self.ident}.mod"
+            data = pd.read_csv(file_path,header=None, sep=",",decimal='.',dtype=float,names=["wl","I"])
+            data.wl=data.iloc[:,0]/10 # Angstrom to nm
+            self._db = data
 
-    def get_db(self, wavelength_interval:tuple[float,float]|None = None, wl_pad:float|int = 10):
+    def get_db(self, wavelength_interval:tuple[float,float]|None = None, wl_pad:float = 10):
         """Return a slice of a database, or LIFBASE spectrum, within the specified `wavelength_interval`.
 
         If no interval is provided (the default), it will lookup the active bounds from the main window.
@@ -468,11 +472,9 @@ class MoleculeCheckBox(QCheckBox):
 
         Note: for automatic lookup of the bounds to work correctly, the widget instance must have a parent that is part of the OESToolbox main window.
         """
-        colname = 'wl' if self.src.upper()=="LIFBASE" else 'air_wavelength'
         if wavelength_interval is None:
             wl_min, wl_max, *_= self.window().get_bounds()
         else:
             wl_min,wl_max = wavelength_interval
-        data = self.db[self.db[colname].between(wl_min - wl_pad, wl_max + wl_pad)]
+        data = self.db[self.db[self.colname_wl].between(wl_min - wl_pad, wl_max + wl_pad)]
         return data
-     
