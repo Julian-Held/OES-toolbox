@@ -351,56 +351,33 @@ class molecule_module:
 
 
     def fit_ready(self, label, ans:lmfit.minimizer.MinimizerResult, x_fit, y_fit):
-        def get_species_name(param_name,split_count=2):
-            """Construct a name for a species from a parameter name, if applicable."""
-            parts = param_name.split("_", split_count)
-            return MOLECULE_DB_LABELS.get(parts[split_count],parts[split_count].replace("_"," ")) if len(parts)>split_count else ""
+        """Callback function that adds new results to the fit table and a plot of the fit to the plot widget.
+        
+        For each result, it adds a new row with the file name, and any `fraction` or `T_rot`/`T_vib` parameters.
 
+        Will figure out of columns need to be added to the table based on the label of fit parameters.
+        It wil NOT remove empty columns however!
+        """
         count = self.mw.mol_fit_results_table.rowCount()
         self.mw.mol_fit_results_table.insertRow(count)
         table = self.mw.mol_fit_results_table
         current_header = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
 
         self.mw.mol_fit_results_table.setItem(count, 0, QTableWidgetItem(label))
-        header = ["file",]
+        header = [] # use lists for deterministic order, instead of sets
         plot_label = ""
-        #TODO: figure out using clean labels for the table, while mapping them to parameter names to populate cells
-        print("========================")
-        print("FIT result:")
 
+        # loop through fit params and add fractions/temperatures to the table; temperatures to plot label as well
         for p in ans.params:
-            print(f"{p}: {ans.params[p]}")
-            match p:
-                case s if "fraction" in s:
-                    # s = s.replace("_", " ")
-                    species_name = get_species_name(s,1)
-                    # col_name = f"fraction {species_name}"
-                    # if col_name not in current_header:
-                    #     header.append(col_name)
-                    if s not in current_header:
-                        header.append(s)
-                case s if "T_rot" in s:
-                    # s = s.replace("rot_","rot ")+" / K"
-                    species_name = get_species_name(s,2)
-                    # col_name = f"Trot {species_name} / K"
-                    # if col_name not in current_header:
-                    #     header.append(col_name)
-                    if s not in current_header:
-                        header.append(s)                   
-                    plot_label += f"Trot {species_name}={ans.params[p].value:.0f} K "
-                case s if "T_vib" in s:
-                    # s = s.replace("vib_","vib ")+" / K"
-                    species_name = get_species_name(s,2)
-                    # col_name = f"Tvib {species_name} / K"
-                    # if col_name not in current_header:
-                    #     header.append(col_name) 
-                    if s not in current_header:
-                        header.append(s)                   
-                    plot_label += f"Tvib {species_name}={ans.params[p].value:.0f} K "
-                case _:
-                    continue
-        print("========================")
-        print(header,current_header)
+            if not p.startswith(("fraction","T_rot","T_vib")):
+                continue
+            param_label = map_param_to_label(p)
+            if param_label not in current_header:
+                header.append(param_label)
+            if p.startswith("T"):
+                plot_label += f"{param_label}={ans.params[p].value:.0f} K "
+
+        # Figure out which columns to add to the table; use list to maintain order
         if header!=current_header:
             complete_header = current_header+[h for h in header if h not in current_header]
             table.setColumnCount(len(complete_header))
@@ -409,10 +386,13 @@ class molecule_module:
             complete_header = header
         
         row_idx = table.rowCount()-1
-        for p in list(set(ans.params)&set(complete_header)):
+        # reverse map of labels to parameter names for looking up the values.
+        param_key_map = {map_param_to_label(k): k for k in ans.params}
+        # use sets for easy intersection; order does not matter here and there won't be duplicates
+        for p in list(set(param_key_map) & set(complete_header)):
             col_idx = complete_header.index(p)
             item = QTableWidgetItem()
-            item.setData(Qt.ItemDataRole.DisplayRole,ans.params[p].value)
+            item.setData(Qt.ItemDataRole.DisplayRole,ans.params[param_key_map[p]].value)
             table.setItem(row_idx,col_idx,item)
 
         self.mw.mol_fit_results_table.item(count, 0).y_fit = y_fit
@@ -552,5 +532,25 @@ class molecule_module:
             self.mw.specplot.removeItem(plot_item)
         self.mw.update_spec_colors()
 
-
     
+def map_param_to_label(param_name):
+    """Map a parameter name to a more human-friendly label with some determinism.
+    
+    Attempts to match any potential species name to the MOLECULE_DB_LABELS dict.
+
+    If any problems occur in future parsing that require adjustments, also update the test in `./tests/test_misc.py`.
+    """
+    parts = param_name.split("_")
+    if param_name.startswith(("T_rot", "T_vib")) and len(parts) > 2:
+        offset = 2
+    elif param_name.startswith(("T_rot", "T_vib")):
+        # edge case: "T_rot" and "T_vib" without species suffix
+        return param_name.replace("_", "")
+    else:
+        offset = 1
+    slice_pre = slice(0,offset)
+
+    pre = "".join(parts[slice_pre])
+    spec = MOLECULE_DB_LABELS.get(param_name.split("_",offset)[-1], param_name.split("_",offset)[-1])
+    
+    return f"{pre} {spec}".strip()
