@@ -994,16 +994,6 @@
              <string>file</string>
             </property>
            </column>
-           <column>
-            <property name="text">
-             <string>Trot / K</string>
-            </property>
-           </column>
-           <column>
-            <property name="text">
-             <string>Tvib / K</string>
-            </property>
-           </column>
           </widget>
          </item>
          <item>
