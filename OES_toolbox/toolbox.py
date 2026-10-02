@@ -111,7 +111,6 @@ class Window(QMainWindow):
             os.makedirs(self.cal_path)
         self.cal = None
         QTimer.singleShot(200, self.cal_files_refresh) # TODO move out of thread to improve startup perfromance
-        self.max_child_plot = 8
         
         # center plot
         self.specplot.setLabel("left", "intensity")
@@ -204,7 +203,7 @@ class Window(QMainWindow):
         # molecules
         self.mol_multitemp_group.hide()
         self.mol_show_btn.clicked.connect(self.mol.show_spec)
-        self.mol_fit_btn.clicked.connect(self.mol.fit)
+        self.mol_fit_btn.clicked.connect(self.mol.on_fit_clicked)
         self.mol_clear_btn.clicked.connect(self.actionClear_Molecule_Plots.trigger)
         self.actionClear_Molecule_Plots.triggered.connect(self.mol.clear_spec)
         self.mol_save_btn.clicked.connect(self.action_export_molecule_fit_results.trigger)
