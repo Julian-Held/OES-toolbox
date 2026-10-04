@@ -122,15 +122,30 @@ class FileLoader:
             pos = []
             line_num = 0
             offset_data=0
+            sep, decimal = None, None
+            data_line_counter = 0
             while line_num < 50:
                 cursor = fo.tell()
                 pos.append(cursor)
                 line = fo.readline().strip()
-                if line and line[0].isdigit():  # first line with data
-                    sep, decimal = cls._infer_text_schema_from_line(line)
-                    offset_data = cursor
-                    line_num_data = line_num
+                if line and line[0].isdigit():  # line with (presumably) data
+                    try:
+                        this_sep, this_decimal = cls._infer_text_schema_from_line(line)
+                    except:
+                        this_sep, this_decimal = None, None
+                    if (sep is not None and decimal is not None and this_sep == sep and this_decimal == decimal):
+                        data_line_counter = data_line_counter + 1
+                    else:
+                        sep, decimal = this_sep, this_decimal
+                        data_line_counter = 1
+                        offset_data = cursor
+                else: # reset if we hit line without data
+                    data_line_counter = 0
+                    sep, decimal = None, None
+
+                if data_line_counter >= 3:  # found this many consecutive lines with data in same format
                     break
+
                 line_num += 1
             cls.logger.debug(f"{f.name}: {enc}, {sep=}, {decimal=}, {offset_data=}")
             df = cls._parse_open_text_file(fo,offset_data,sep,decimal, on_bad_lines='skip')
@@ -140,7 +155,7 @@ class FileLoader:
                 idx = pos.index(offset_data)-1
                 fo.seek(pos[idx])
                 heading_line = fo.readline().strip()
-                if heading_line.replace(sep,"").strip() =="" and idx>0: # empty line, look one line further back if possible
+                if heading_line.replace(sep,"").strip() == "" and idx>0: # empty line, look one line further back if possible
                     fo.seek(pos[idx-1])
                     heading_line = fo.readline().strip()
                 if sep in heading_line:
