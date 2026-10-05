@@ -2,18 +2,17 @@ import os
 import datetime
 from pathlib import Path
 import numpy as np
-from scipy.signal import fftconvolve
-
 from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetItem, \
         QMessageBox, QCheckBox, QMenu
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
-from PyQt6 import QtGui
+from PyQt6 import QtGui, QtWidgets
 import pyqtgraph as pg
 
 from .Widgets import MoleculeCheckBox, SpectrumTreeItem
 from .lazy_import import lazy_import
 scipy = lazy_import("scipy")
+lmfit = lazy_import("lmfit")
 Moose = lazy_import("Moose")
 Moose.Simulation = lazy_import("Moose.Simulation")
 
@@ -23,8 +22,8 @@ if TYPE_CHECKING:
 
     from pandas import DataFrame
 
-import lmfit
-from Moose.lmfit import multi_species_objective
+
+from .calc import make_fit_params, molecule_objective
 
 PARAMARGS = ('vary',"min",'max')
 
@@ -66,65 +65,6 @@ PlotItemRole = Qt.ItemDataRole.UserRole+1
 FitResultRole = Qt.ItemDataRole.UserRole+2
 
 
-def make_fit_params(y, species:list[str], Trot:float, Tvib:float, sigma:float,gamma:float, mu:float, separate_Tvib=True, separate_Trot=True, vary_broadening=True, vary_shift=False) -> lmfit.parameter.Parameters:
-    """Construct suitable fit parameters with bounds for fitting a spectrum with the `Moose.lmfit.multi_species_objective` function.
-
-    For each element in the `species` list, it will add `fraction` and optional `T_rot`/`T_vib` parameters, as appropriate.
-    
-    Will calculate bounds and set parameters as free/fixed depending on provided arguments, which can come from the UI state.
-
-    The parameter bounds are made assuming that `multi_species_objective` will be called with the `normalize` kwargs set to `True`.
-
-    This means that `fraction` should be interpreted as a non-normalized `weight` to the total intensity, and is affected by strength of emitter.
-
-    (Stronger emitters will cause a lower weight).
-
-    Arguments:
-        y (NDArray):            The array of y-data, to calculate offset parameter `b` and total amplitude `A` from.
-        species (list[str]):    List of species names, for the species that will be used in the model objective function
-        Trot (float):           Initial estimate of T_rot
-        Tvib (float):           Initial estimate of T_vib
-        sigma (float):          Initial estimate of Gaussian width in nm.
-        gamma (float):          Initial estimate of Lorentzian width in nm.
-        mu (float):             Initial wavelength shift in nm.
-        separate_Tvib (bool):   Flag to use different vibrational temperatures for each species
-        separate_Trot (bool):   Flag to use different rotational temperatures for each species
-        vary_broadening (bool): Flag to optimize broadening parameters during fit, or leave them fixed.
-        vary_shift (bool):      Flag to vary the wavelength shift during fitting, or leave it fixed.
-    
-    Returns:
-        Parameters:     A lmfit.Parameters instance with parameter values and bounds configured according to the current UI settings.
-    """
-    #TODO: decide if using `normalize=True` or `False`.
-    separate_Tvib = separate_Tvib and (len(species)>1)
-    separate_Trot = separate_Trot and (len(species)>1)
-    y_min = y.min()
-    y_max = y.max()
-    y_diff = y_max-y_min
-    # var = (y-y_min).std()
-    params = lmfit.create_params(**DEFAULT_PARAMS)
-    params.add("b", y_min, True, y_min - y_diff, y_min + y_diff)
-    params.add("A", y_diff, vary =True, min = 0, max = y_diff*1.5)
-    # params.pop("A")  # use this if using `normalize=False`
-    params['sigma'].set(value = sigma, vary=vary_broadening, min=1e-3,max=1)
-    params['gamma'].set(value=gamma, vary=vary_broadening, min=1e-3, max=1)
-    params['mu'].set(value = mu, vary=vary_shift)
-    params['T_rot'].value = Trot
-    params['T_vib'].value = Tvib
-    weight = 1/len(species)*y_diff
-    if separate_Tvib:
-        params.pop("T_vib")
-    if separate_Trot:
-        params.pop("T_rot")
-    for specie in species:
-        if separate_Trot:
-            params.add(f"T_rot_{specie}", value = Trot, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
-        if separate_Tvib:
-            params.add(f"T_vib_{specie}", value = Tvib, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
-        params.add(f"fraction_{specie}", weight,vary=True,min=0,max=1) # adjust if using `normalize=False`
-    return params
-
-
 class MoleculeFitter(QObject):
     finished = pyqtSignal()
     result_ready = pyqtSignal(str, lmfit.minimizer.MinimizerResult, np.ndarray, np.ndarray)
@@ -160,11 +100,12 @@ class MoleculeFitter(QObject):
             vary_shift = self.allow_shift,
             separate_Tvib=self.sep_Tvib, 
             separate_Trot=self.sep_Trot,
-            vary_broadening=True
+            vary_broadening=True,
+            vary_stretch = self.allow_stretch
         )
         # TODO: investigate if error handling is needed.
         result = lmfit.minimize(
-            multi_species_objective,
+            molecule_objective,
             params,
             args=(self.x,),
             kws=
@@ -176,7 +117,7 @@ class MoleculeFitter(QObject):
             ftol=1e-10,
             max_nfev = 2000
         )
-        y_fit = multi_species_objective(result.params, x = self.x, normalize = True, **self.molecule_dbs)
+        y_fit = molecule_objective(result.params, x = self.x, normalize = True, **self.molecule_dbs)
         self.result_ready.emit(self.label, result, self.x, y_fit)
         self.progress.emit(-1)
         self.finished.emit()
@@ -411,8 +352,9 @@ class molecule_module:
             item.setData(Qt.ItemDataRole.DisplayRole,ans.params[param_key_map[p]].value)
             table.setItem(row_idx,col_idx,item)
 
-        self.mw.mol_fit_results_table.item(count, 0).y_fit = y_fit
-        self.mw.mol_fit_results_table.item(count, 0).x_fit = x_fit
+        # There seems no code that uses the stored data; this is also not the cannonical Qt way to store this.
+        # self.mw.mol_fit_results_table.item(count, 0).y_fit = y_fit
+        # self.mw.mol_fit_results_table.item(count, 0).x_fit = x_fit
 
         # Create the plot item and associate it with the 'file name' cell as UserData, same as fit result, using `PlotItemRole`.
         # Untill we use a proper MVC pattern, this may be a good start point to show e.g. residual etc.
@@ -424,9 +366,6 @@ class molecule_module:
         is_shown = f"file: {label.strip()}" in {item.name() for item in self.mw.specplot.listDataItems()}
         if is_shown:
             self.mw.specplot.addItem(plot_item, ignoreBounds=True)
-
-        # this is already called through a signal when each fit worker finishes.            
-        # self.mw.update_spec_colors()
 
 
     def on_fit_clicked(self):

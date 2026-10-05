@@ -89,12 +89,11 @@ class Window(QMainWindow):
         self.statusBar().addPermanentWidget(self.progress_bar)
         self.progress_bar.hide()
         self.status_msg = QLabel()
-        self.statusBar().addPermanentWidget(self.status_msg)
+        self.statusBar().addWidget(self.status_msg)
         self.logger = ContextLogger(self)
         self.log_widget = LogWidget()
         actionShowLog = self.menuView.addAction("Show log")
         actionShowLog.triggered.connect(self.log_widget.show)
-        # self.progress_bar.hide()
         
         self.settings = settings(self)
         self.mol = molecule_module(self)
@@ -186,8 +185,6 @@ class Window(QMainWindow):
         self.action_export_ident_table.triggered.connect(lambda : FileExport.save_table(self.ident_table))
         self.ident_clear.clicked.connect(self.actionClear_Ident_Plots.triggered)
         self.actionClear_Ident_Plots.triggered.connect(self.ident.clear_spec_ident)
-
-        self.working = 0
         
         # continuum radiation
         self.show_continuum_btn.clicked.connect(self.cont.plot_continuum0)
@@ -433,16 +430,18 @@ class Window(QMainWindow):
                 cc = cc%len(colors)
     
     
-    def update_progress_bar(self,p):
-        self.working = self.working + p
-        if self.working == 0:
+    def update_progress_bar(self,p:int):
+        if self.progress_bar.value()<0:
+            self.progress_bar.setValue(0)
+        self.progress_bar.setValue(self.progress_bar.value()+p)
+        if self.progress_bar.value() == self.progress_bar.maximum():
             self.progress_bar.hide()
-            self.status_msg.show()
             self.ident_go.setEnabled(True)
             self.ident_clear.setEnabled(True)
+            self.progress_bar.setValue(-1)
+            self.progress_bar.setMaximum(0)
         else:
             self.progress_bar.show()
-            self.status_msg.hide()
             self.ident_go.setEnabled(False)
             self.ident_clear.setEnabled(False)
             
