@@ -398,6 +398,8 @@ class molecule_module:
         if is_shown:
             self.mw.specplot.addItem(plot_item, ignoreBounds=True)
 
+        self.mw.update_spec_colors() # call update_spec_colors here instead of when fired by "finished" signal of worker
+
 
     def on_fit_clicked(self):
         """Fires the fit callback when the 'Fit' button is pressed, scheduling the work.
