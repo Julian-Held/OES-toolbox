@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from xarray import DataArray,Dataset
     from numpy.typing import NDArray,ArrayLike
 
-from OES_toolbox.logger import Logger
+from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 
 pd = lazy_import("pandas")
@@ -62,7 +62,7 @@ class FileLoader:
     
     Contains various methods and helpers to facilitate inferring file schema and loading the data.
     """
-    logger = Logger(instance=None, context={"class":"FileLoader"})
+    logger = ContextLogger(instance=None, context={"class":"FileLoader"})
 
     @staticmethod
     def _infer_text_schema_from_line(line: str) -> tuple[str, str]:

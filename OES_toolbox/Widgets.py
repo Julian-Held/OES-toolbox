@@ -1,13 +1,19 @@
 from pathlib import Path
+import os
 import numpy as np
-from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
-from PyQt6.QtGui import QAction,QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu, QPushButton, QInputDialog
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal, QThreadPool, QTimer
 import pyqtgraph as pg
 import qtawesome as qta
 
+import Moose
+
 from OES_toolbox.file_handling import FileLoader, SpectraDataset
-from OES_toolbox.logger import Logger
+from OES_toolbox.logger import ContextLogger
+from OES_toolbox.lazy_import import lazy_import
+
+pd = lazy_import("pandas")
 
 from typing import TYPE_CHECKING
 from collections.abc import Callable
@@ -19,11 +25,11 @@ class SpectrumTreeItem(QTreeWidgetItem):
 
     ignored_files = [".png", ".jpg", ".ico", ".svg", ".pdf", ".ipynb", ".py", ".pyc"]
     ignored_prefix = ["_","."]
-    logger = Logger(instance=None, context={"class":"SpectrumTreeItem"})
+    logger = ContextLogger(instance=None, context={"class":"SpectrumTreeItem"})
 
     _ICON_FOLDER = qta.icon("mdi6.folder")
     _ICON_FILE = qta.icon("mdi6.file-outline",color="gray")
-    _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold", color="black")
+    _ICON_FILE_CACHED = qta.icon("mdi6.file-outline","mdi6.check-bold")
     _ICON_BG = qta.icon("mdi.layers")
     _ICON_IO_ERROR = qta.icon("mdi6.file-outline","ei.remove", options=[{"color":"gray"},{"color":"red"}])
     _ICON_BG_ACTIVE = qta.icon("mdi6.file-minus-outline")
@@ -110,9 +116,6 @@ class SpectrumTreeItem(QTreeWidgetItem):
         parent_name = f"{self.parent().name()}" if self.parent() is not None else ""
         full_name =  f"{parent_name}{name_stem}".strip().strip("/").strip(":")
         return full_name
-    
-    def is_plotted(self, plot):
-        return self.graph in plot.allChildItems()
     
     @property
     def checked(self):
@@ -410,3 +413,123 @@ class SpectrumTreeItem(QTreeWidgetItem):
             self.is_content = True # needed to force non-nested files to plot their data, without adding a child node.
             self.set_spectrum(x,y,shift=shift,bg=dataset.background,name=None,bg_is_internal=dataset.has_background)
         self.set_background(None)
+
+class MoleculeCheckBox(QCheckBox):
+    """A checkbox that enables a user to select molecular bands to show or fit.
+    
+    Handles both static spectra from LIFBASE simulation, as well as database files for simulation/fitting.
+
+    Only loads data when needed, caching it to the `_db` attribute.
+
+    A subset of the data (in wavelength range), can be obtained using the `get_db` method.
+    """
+
+    signalLoadingStarted = pyqtSignal(str)
+    signalLoadingDone = pyqtSignal()
+
+    def __init__(self, ident: str, label: str = None, src: str = "LIFBASE", parent=None):
+        super().__init__(parent=parent)
+        self.ident = ident
+        self.label = ident if label is None else label
+        self.src = src
+        self.can_fit = self.src == "Moose"
+        self.colname_wl = 'wl' if self.src.upper()=="LIFBASE" else 'air_wavelength'
+        self.setText(self.label)
+        self._db = None
+
+    @property
+    def db(self):
+        if self._db is None:
+            self._load_database()
+        return self._db
+    
+    def _load_database(self):
+        """Load a database or sample LIFBASE simulation and cache it on the instance.
+        
+        The database/file is only loaded if the `_db` attribute is (still) `None`.
+        
+        No filtering/slicing is applied to the database, so it can be cached and re-used effectively.
+        """
+        if self.can_fit and self._db is None:
+            self.signalLoadingStarted.emit(f"Loading: {self.label}")
+            self._db = Moose.query_DB(self.ident)
+            self.signalLoadingDone.emit()
+        elif not self.can_fit and self.src=="LIFBASE" and self._db is None:
+            # Read the LIFBASE output files, which use lots of whitespace padding and must thus be coerced to float rather than string
+            # FileLoader._read_generic_text fails correctly detecting separator/delimiter because of whitespacing.
+            file_path = f"{Path(__file__).parent}/data/mol_spec/{self.ident}.mod"
+            data = pd.read_csv(file_path,header=None, sep=",",decimal='.',dtype=float,names=["wl","I"])
+            data.wl=data.iloc[:,0]/10 # Angstrom to nm
+            self._db = data
+
+    def get_db(self, wavelength_interval:tuple[float,float]|None = None, wl_pad:float = 10):
+        """Return a slice of a database, or LIFBASE spectrum, within the specified `wavelength_interval`.
+
+        If no interval is provided (the default), it will lookup the active bounds from the main window.
+
+        If no data(base) has been loaded yet, calling this method will trigger a `load_database` call, which will cache the data.
+
+        To avoid edge effects, it will look up a slightly wider slice of data on both sides of the interval, based on the `wl_pad` argument (default=10).
+
+        Note: for automatic lookup of the bounds to work correctly, the widget instance must have a parent that is part of the OESToolbox main window.
+        """
+        if wavelength_interval is None:
+            wl_min, wl_max, *_= self.window().get_bounds()
+        else:
+            wl_min,wl_max = wavelength_interval
+        data = self.db[self.db[self.colname_wl].between(wl_min - wl_pad, wl_max + wl_pad)]
+        return data
+
+
+class ThreadPoolMonitor(QPushButton):
+    """A button widget to monitor and configure the threadpool, for use in e.g. a status bar.
+
+    Shows the (T)otal and(A)ctive count of threads in the threadpool.
+
+    Clicking on it will update the max thread count through a dialog.
+
+    Note:
+        Currently molecular band fitting does not benefit from more threads (runtime remains largely equal, regardless of threads).
+        This is likely due to the python Global Interpreter Lock (GIL) not being released, meaning QThreads cannot run concurretly.
+        In fact, using more threads for a long queue increases thread contention, meaning time-to-first-result increases.
+        Meanwhile overall runtime stays the same, so this actually hurts the user experience without any gains.
+        
+        This widget remains (but hidden) so that we can check easily if things change in the future.
+    """
+    def __init__(self,parent=None, max_threadcount=1, hide=True):
+        tip = "(T)otal, (A)ctive threads.\nNote: Fitting does not benefit from more threads.\nClick to configure."
+        self.formatStr = "Threadpool (T:%d, A:%d)"
+        super().__init__(self.formatStr % (0,0), parent)
+        self._pool = QThreadPool.globalInstance()
+        self._pool.setMaxThreadCount(max_threadcount)
+        self._cb_timer = QTimer(self)
+        self._cb_timer.timeout.connect(self.update_status)
+        self._cb_timer.start(300)
+        self.count_queued = 0
+        self.clicked.connect(self.on_click)
+        self.setStatusTip(tip.replace("\n"," "))
+        self.setToolTip(tip)
+        if hide:
+            self.hide()
+
+    @property
+    def max_threads(self):
+        if hasattr(os,"process_cpu_count"):
+            return os.process_cpu_count()
+        return os.cpu_count()
+
+    def update_status(self):
+        self.setText(self.formatStr % (self._pool.maxThreadCount(), self._pool.activeThreadCount()))
+
+    def on_click(self):
+        max_threads, ok = QInputDialog.getInt(
+            self, 
+            "Set Max Threads", 
+            "Note: Fitting does not benefit from more threads.\n"
+            "Maximum number of threads:",
+            self._pool.maxThreadCount(), 
+            1, 
+            self.max_threads
+        )
+        if ok:
+            self._pool.setMaxThreadCount(max_threads)

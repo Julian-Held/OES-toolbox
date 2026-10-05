@@ -342,64 +342,103 @@
            <property name="title">
             <string>Instrumental profile</string>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_14">
-            <item>
-             <widget class="QLabel" name="label_16">
-              <property name="text">
-               <string>Pseudo Voigt (shape 0 = Gauss)</string>
+           <layout class="QGridLayout" name="gridLayout">
+            <item row="2" column="1">
+             <widget class="SpinBox" name="mol_instr_w">
+              <property name="decimals">
+               <number>3</number>
+              </property>
+              <property name="maximum">
+               <double>10.000000000000000</double>
+              </property>
+              <property name="minimum">
+               <double>0.0001</double>
+              </property>
+              <property name="singleStep">
+               <double>0.010000000000000</double>
+              </property>
+              <property name="value">
+               <double>0.010000000000000</double>
+              </property>
+              <property name="toolTip">
+               <string>Gaussian stdev in nm, for Voigt profile</string>
               </property>
              </widget>
             </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_33">
-              <item>
+            <item row="1" column="0">
                <widget class="QLabel" name="label_18">
                 <property name="text">
                  <string>Shape (0-1)</string>
                 </property>
+              <property name="hidden">
+               <bool>true</bool>
+              </property>
                </widget>
               </item>
-              <item>
+            <item row="1" column="1">
                <widget class="QDoubleSpinBox" name="mol_instr_mu">
                 <property name="maximum">
                  <double>1.000000000000000</double>
                 </property>
+              <property name="minimum">
+               <double>0</double>
+              </property>
                 <property name="singleStep">
-                 <double>0.100000000000000</double>
+               <double>0.01</double>
                 </property>
                 <property name="value">
                  <double>0.500000000000000</double>
                 </property>
+              <property name="hidden">
+               <bool>true</bool>
+              </property>
                </widget>
               </item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_32">
-              <item>
+            <item row="2" column="0">
                <widget class="QLabel" name="label_17">
                 <property name="text">
-                 <string>Width [nm]</string>
+               <string>Gaussian width [nm]</string>
                 </property>
                </widget>
               </item>
-              <item>
-               <widget class="QDoubleSpinBox" name="mol_instr_w">
+            <item row="0" column="0" colspan="2">
+             <widget class="QLabel" name="label_16">
+              <property name="text">
+               <string>Pseudo Voigt (shape 0 = Gauss)</string>
+              </property>
+              <property name="hidden">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="label_19">
+              <property name="text">
+               <string>Lorentzian width [nm]</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="SpinBox" name="mol_instr_gamma">
                 <property name="decimals">
                  <number>3</number>
                 </property>
+              <property name="minimum">
+                <double>0.0001</double>
+              </property>
                 <property name="maximum">
-                 <double>10.000000000000000</double>
-                </property>
-                <property name="singleStep">
-                 <double>0.010000000000000</double>
+                <double>10.0</double>
                 </property>
                 <property name="value">
                  <double>0.010000000000000</double>
                 </property>
+              <property name="singleStep">
+               <double>0.01</double>
+              </property>
+              <property name="toolTip">
+                <string>Lorentzian half-width in nm, for Voigt profile.</string>
+              </property>
                </widget>
-              </item>
-             </layout>
             </item>
            </layout>
           </widget>
@@ -953,16 +992,6 @@
            <column>
             <property name="text">
              <string>file</string>
-            </property>
-           </column>
-           <column>
-            <property name="text">
-             <string>Trot / K</string>
-            </property>
-           </column>
-           <column>
-            <property name="text">
-             <string>Tvib / K</string>
             </property>
            </column>
           </widget>

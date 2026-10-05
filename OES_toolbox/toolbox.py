@@ -27,11 +27,12 @@ from OES_toolbox.settings import settings
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
-from OES_toolbox.Widgets import SpectrumTreeItem
-from OES_toolbox.logger import Logger
+from OES_toolbox.Widgets import SpectrumTreeItem, ThreadPoolMonitor
+from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
 from OES_toolbox.exporters import FileExport, OESMatplotlibExporter
+from OES_toolbox.loggerWidget import LogWidget
 
 from importlib.metadata import metadata
 scipy = lazy_import("scipy")
@@ -88,8 +89,13 @@ class Window(QMainWindow):
         self.statusBar().addPermanentWidget(self.progress_bar)
         self.progress_bar.hide()
         self.status_msg = QLabel()
-        self.statusBar().addPermanentWidget(self.status_msg)
-        self.logger = Logger(self)
+        self.statusBar().addWidget(self.status_msg)
+        self.treadpool_monitor = ThreadPoolMonitor(self)
+        self.statusBar().addPermanentWidget(self.treadpool_monitor)
+        self.logger = ContextLogger(self)
+        self.log_widget = LogWidget()
+        actionShowLog = self.menuView.addAction("Show log")
+        actionShowLog.triggered.connect(self.log_widget.show)
         
         self.settings = settings(self)
         self.mol = molecule_module(self)
@@ -106,7 +112,6 @@ class Window(QMainWindow):
             os.makedirs(self.cal_path)
         self.cal = None
         QTimer.singleShot(200, self.cal_files_refresh) # TODO move out of thread to improve startup perfromance
-        self.max_child_plot = 8
         
         # center plot
         self.specplot.setLabel("left", "intensity")
@@ -182,8 +187,6 @@ class Window(QMainWindow):
         self.action_export_ident_table.triggered.connect(lambda : FileExport.save_table(self.ident_table))
         self.ident_clear.clicked.connect(self.actionClear_Ident_Plots.triggered)
         self.actionClear_Ident_Plots.triggered.connect(self.ident.clear_spec_ident)
-
-        self.working = 0
         
         # continuum radiation
         self.show_continuum_btn.clicked.connect(self.cont.plot_continuum0)
@@ -199,7 +202,7 @@ class Window(QMainWindow):
         # molecules
         self.mol_multitemp_group.hide()
         self.mol_show_btn.clicked.connect(self.mol.show_spec)
-        self.mol_fit_btn.clicked.connect(self.mol.fit)
+        self.mol_fit_btn.clicked.connect(self.mol.on_fit_clicked)
         self.mol_clear_btn.clicked.connect(self.actionClear_Molecule_Plots.trigger)
         self.actionClear_Molecule_Plots.triggered.connect(self.mol.clear_spec)
         self.mol_save_btn.clicked.connect(self.action_export_molecule_fit_results.trigger)
@@ -429,16 +432,18 @@ class Window(QMainWindow):
                 cc = cc%len(colors)
     
     
-    def update_progress_bar(self,p):
-        self.working = self.working + p
-        if self.working == 0:
+    def update_progress_bar(self,p:int):
+        if self.progress_bar.value()<0:
+            self.progress_bar.setValue(0)
+        self.progress_bar.setValue(self.progress_bar.value()+p)
+        if self.progress_bar.value() == self.progress_bar.maximum():
             self.progress_bar.hide()
-            self.status_msg.show()
             self.ident_go.setEnabled(True)
             self.ident_clear.setEnabled(True)
+            self.progress_bar.setValue(-1)
+            self.progress_bar.setMaximum(0)
         else:
             self.progress_bar.show()
-            self.status_msg.hide()
             self.ident_go.setEnabled(False)
             self.ident_clear.setEnabled(False)
             
@@ -648,7 +653,42 @@ class Window(QMainWindow):
         while iterator.value():
             iterator.value().setCheckState(0,Qt.CheckState.Unchecked)
             iterator += 1
-            
+
+    def get_bounds(self)->tuple[float,float,float,float]:
+        """Get the bounds to apply to the data from the UI state.
+        
+        Finds wavelength and signal ranges from plotted file data ranges.
+
+        If a user specified limit is active, determine the y bounds in this range instead.
+
+        When there is no data plotted from a file, falls back to the user specified limits (if checked), or the range (0 nm,1200 nm).
+
+        This avoids plotting data only between 0 nm and 1 nm at program start.
+
+        Note: when only plotting simulations, replotting will first clear the plot widget, causing new plots to default to the (0,1200) range
+
+        TODO: account for padding of the data range by the viewbox, causing ever increasing ranges with repeated actions.
+        """
+        orthoRange=[None,None]
+        min_x = self.mol_min_wl_sbox.value()
+        max_x = self.mol_max_wl_sbox.value()
+        if self.mol_limit_range_check.isChecked():
+            # orthoRange must provided limits of orthogonal axes, thus orthoRange[1] corresponds to x limits to apply when finding y bounds
+            orthoRange[1] = (min_x,max_x)
+
+        vb = self.specplot.getViewBox()
+        target_range = vb.targetRange()
+        file_items = [item for item in vb.addedItems if 'file' in item.name()]
+        
+        # if len(file_items)<=0:
+        if len(vb.addedItems)<=0:
+            target_range[0]=[min_x,max_x] if self.mol_limit_range_check.isChecked() else [0,1200]
+        bounds =vb.childrenBounds(orthoRange=orthoRange, items=file_items if len(file_items)>0 else None)
+        if bounds[0] is None:
+            bounds[0] = target_range[0]
+        if bounds[1] is None:
+            bounds[1] = target_range[1]
+        return [value for pair in bounds for value in pair]
 
 ##############################################################################
 # <--------------------------- drag & drop --------------------------------> #

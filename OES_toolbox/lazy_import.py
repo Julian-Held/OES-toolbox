@@ -3,9 +3,9 @@ import importlib.util
 import sys
 import time
 
-from OES_toolbox.logger import Logger
+from OES_toolbox.logger import ContextLogger
 
-logger = Logger(instance=None,context={"class":"lazy_import"})
+logger = ContextLogger(instance=None,context={"class":"lazy_import"})
 
 def lazy_import(name):
     tstart = time.perf_counter()
