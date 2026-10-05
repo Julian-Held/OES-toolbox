@@ -18,8 +18,7 @@ Moose.Simulation = lazy_import("Moose.Simulation")
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
+    import lmfit.minimizer
     from pandas import DataFrame
 
 from .workers import MooseFitWorker
@@ -77,7 +76,7 @@ class MoleculeFitter(QObject):
         * Also, when using only one (or very few) QRunnable's means results arrive 'in-order' of submission.
     """
     finished = pyqtSignal()
-    result_ready = pyqtSignal(str, lmfit.minimizer.MinimizerResult, np.ndarray, np.ndarray)
+    result_ready = pyqtSignal(str, object, np.ndarray, np.ndarray)
     progress = pyqtSignal(int)
 
     
@@ -338,7 +337,7 @@ class molecule_module:
         label, ans, x_fit, y_fit = result
         self.fit_ready(label,ans,x_fit,y_fit)
 
-    def fit_ready(self, label, ans:lmfit.minimizer.MinimizerResult, x_fit, y_fit):
+    def fit_ready(self, label, ans:"lmfit.minimizer.MinimizerResult", x_fit, y_fit):
         """Callback function that adds new results to the fit table and a plot of the fit to the plot widget.
         
         For each result, it adds a new row with the file name, and any `fraction` or `T_rot`/`T_vib` parameters.
