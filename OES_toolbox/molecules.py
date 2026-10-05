@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetItem, \
         QMessageBox, QCheckBox, QMenu
-from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QThreadPool
 from PyQt6.QtGui import QAction
 from PyQt6 import QtGui, QtWidgets
 import pyqtgraph as pg
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from pandas import DataFrame
 
-
+from .workers import MooseFitWorker
 from .calc import make_fit_params, molecule_objective
 
 PARAMARGS = ('vary',"min",'max')
@@ -66,6 +66,16 @@ FitResultRole = Qt.ItemDataRole.UserRole+2
 
 
 class MoleculeFitter(QObject):
+    """# TODO: Superseded by workers.MooseFitWorker. Remove code when satisfied with the change and migration.
+    
+    Notes:
+        * It seems MoleculeFitter leaks memory, when performing batches of fits memory grows and stays high after queue finishes.
+        * Repeating the batch only grows memory, even when the result table is cleared.
+        * Current use of MoleculeFitter schedules all fits at once, creates many threads, leading to high contention.
+        * Above issues seem resolved when using QRunnables instead, who are managed by the global QThreadPool.
+        * Using fewer QRunnable threads (recommended: 1) gives fastest "time-to-first-result" in a batch
+        * Also, when using only one (or very few) QRunnable's means results arrive 'in-order' of submission.
+    """
     finished = pyqtSignal()
     result_ready = pyqtSignal(str, lmfit.minimizer.MinimizerResult, np.ndarray, np.ndarray)
     progress = pyqtSignal(int)
@@ -277,35 +287,56 @@ class molecule_module:
             y = y[mask]
             x = x[mask]
         sigma,gamma = self.get_instr()
-        mol_fit_thread = QThread()
-        fit_worker = MoleculeFitter(
-            label = label, 
-            x = x, 
-            y = y, 
-            T_rot = Trot0,
-            T_vib = Tvib0, 
-            molecule_dbs = dbs,
-            sep_Trot = separate_Trot, 
-            sep_Tvib = separate_Tvib,
-            sigma = sigma,
-            gamma = gamma,
-            allow_shift = self.mw.mol_wl_shift_check.isChecked(),
-            allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
-        )
-        
-        fit_worker.moveToThread(mol_fit_thread)
-        mol_fit_thread.started.connect(fit_worker.fit)
-        fit_worker.result_ready.connect(self.fit_ready)
-        fit_worker.progress.connect(self.mw.update_progress_bar)
-        fit_worker.finished.connect(self.mw.update_spec_colors)
-        fit_worker.finished.connect(fit_worker.deleteLater)
-        mol_fit_thread.finished.connect(mol_fit_thread.deleteLater)
-        mol_fit_thread.start()
-        # We need to store the local objects in a "self" list to ensure
-        # they are not garbage collected right after the button press
-        self.mol_fit_threads.append(mol_fit_thread) 
-        self.mol_fit_workers.append(fit_worker)
 
+        ### QThread-based
+        # mol_fit_thread = QThread()
+        # fit_worker = MoleculeFitter(
+        #     label = label, 
+        #     x = x, 
+        #     y = y, 
+        #     T_rot = Trot0,
+        #     T_vib = Tvib0, 
+        #     molecule_dbs = dbs,
+        #     sep_Trot = separate_Trot, 
+        #     sep_Tvib = separate_Tvib,
+        #     sigma = sigma,
+        #     gamma = gamma,
+        #     allow_shift = self.mw.mol_wl_shift_check.isChecked(),
+        #     allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
+        # ) 
+        # fit_worker.moveToThread(mol_fit_thread)
+        # mol_fit_thread.started.connect(fit_worker.fit)
+        # fit_worker.result_ready.connect(self.fit_ready)
+        # fit_worker.progress.connect(self.mw.update_progress_bar)
+        # fit_worker.finished.connect(self.mw.update_spec_colors)
+        # fit_worker.finished.connect(fit_worker.deleteLater)
+        # mol_fit_thread.finished.connect(mol_fit_thread.deleteLater)
+        # mol_fit_thread.start()
+        # # We need to store the local objects in a "self" list to ensure
+        # # they are not garbage collected right after the button press
+        # self.mol_fit_threads.append(mol_fit_thread) 
+        # self.mol_fit_workers.append(fit_worker)
+
+        #### QRunnable based
+        allow_shift = self.mw.mol_wl_shift_check.isChecked()
+        allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
+
+        params=make_fit_params(y,dbs,Trot0,Tvib0, sigma, gamma,0,separate_Tvib, separate_Trot,True, allow_shift, allow_stretch)
+        worker = MooseFitWorker(label, x, y, params, dbs)
+        # TODO: It seems that with QRunnable we don't need to store a ref; the pool by default takes ownership of the QRunnable.
+        # self.mol_fit_workers.append(worker) # store ref to guard against gc
+        # worker.signals.finished.connect(lambda: self.mol_fit_workers.remove(worker))
+        worker.signals.result.connect(self.fit_ready_runnable)
+        worker.signals.progress.connect(self.mw.update_progress_bar)
+        self.mw.progress_bar.setMaximum(self.mw.progress_bar.maximum()+1)
+        QThreadPool.globalInstance().start(worker)
+
+
+    def fit_ready_runnable(self, result):
+        """Shallow wrapper of `fit_ready` method for interop of QRunnable-based worker result signals with the MoleculeFitter result signal."""
+        #TODO: if MoleculeFitter is deprecated, merge this with `fit_ready` directly
+        label, ans, x_fit, y_fit = result
+        self.fit_ready(label,ans,x_fit,y_fit)
 
     def fit_ready(self, label, ans:lmfit.minimizer.MinimizerResult, x_fit, y_fit):
         """Callback function that adds new results to the fit table and a plot of the fit to the plot widget.

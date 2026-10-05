@@ -27,7 +27,7 @@ from OES_toolbox.settings import settings
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
-from OES_toolbox.Widgets import SpectrumTreeItem
+from OES_toolbox.Widgets import SpectrumTreeItem, ThreadPoolMonitor
 from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
@@ -90,6 +90,8 @@ class Window(QMainWindow):
         self.progress_bar.hide()
         self.status_msg = QLabel()
         self.statusBar().addWidget(self.status_msg)
+        self.treadpool_monitor = ThreadPoolMonitor(self)
+        self.statusBar().addPermanentWidget(self.treadpool_monitor)
         self.logger = ContextLogger(self)
         self.log_widget = LogWidget()
         actionShowLog = self.menuView.addAction("Show log")

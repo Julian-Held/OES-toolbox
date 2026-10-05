@@ -1,8 +1,9 @@
 from pathlib import Path
+import os
 import numpy as np
-from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu
-from PyQt6.QtGui import QAction,QIcon
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QTreeWidgetItem, QCheckBox, QMenu, QPushButton, QInputDialog
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal, QThreadPool, QTimer
 import pyqtgraph as pg
 import qtawesome as qta
 
@@ -478,3 +479,57 @@ class MoleculeCheckBox(QCheckBox):
             wl_min,wl_max = wavelength_interval
         data = self.db[self.db[self.colname_wl].between(wl_min - wl_pad, wl_max + wl_pad)]
         return data
+
+
+class ThreadPoolMonitor(QPushButton):
+    """A button widget to monitor and configure the threadpool, for use in e.g. a status bar.
+
+    Shows the (T)otal and(A)ctive count of threads in the threadpool.
+
+    Clicking on it will update the max thread count through a dialog.
+
+    Note:
+        Currently molecular band fitting does not benefit from more threads (runtime remains largely equal, regardless of threads).
+        This is likely due to the python Global Interpreter Lock (GIL) not being released, meaning QThreads cannot run concurretly.
+        In fact, using more threads for a long queue increases thread contention, meaning time-to-first-result increases.
+        Meanwhile overall runtime stays the same, so this actually hurts the user experience without any gains.
+        
+        This widget remains (but hidden) so that we can check easily if things change in the future.
+    """
+    def __init__(self,parent=None, max_threadcount=1, hide=True):
+        tip = "(T)otal, (A)ctive threads.\nNote: Fitting does not benefit from more threads.\nClick to configure."
+        self.formatStr = "Threadpool (T:%d, A:%d)"
+        super().__init__(self.formatStr % (0,0), parent)
+        self._pool = QThreadPool.globalInstance()
+        self._pool.setMaxThreadCount(max_threadcount)
+        self._cb_timer = QTimer(self)
+        self._cb_timer.timeout.connect(self.update_status)
+        self._cb_timer.start(300)
+        self.count_queued = 0
+        self.clicked.connect(self.on_click)
+        self.setStatusTip(tip.replace("\n"," "))
+        self.setToolTip(tip)
+        if hide:
+            self.hide()
+
+    @property
+    def max_threads(self):
+        if hasattr(os,"process_cpu_count"):
+            return os.process_cpu_count()
+        return os.cpu_count()
+
+    def update_status(self):
+        self.setText(self.formatStr % (self._pool.maxThreadCount(), self._pool.activeThreadCount()))
+
+    def on_click(self):
+        max_threads, ok = QInputDialog.getInt(
+            self, 
+            "Set Max Threads", 
+            "Note: Fitting does not benefit from more threads.\n"
+            "Maximum number of threads:",
+            self._pool.maxThreadCount(), 
+            1, 
+            self.max_threads
+        )
+        if ok:
+            self._pool.setMaxThreadCount(max_threads)
